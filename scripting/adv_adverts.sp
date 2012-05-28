@@ -1,17 +1,25 @@
 #pragma semicolon 1
+//Comment out this line if you want to use this on something other than tf2
+//#define TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
 #include <steamtools>
 #define REQUIRE_EXTENSIONS
+#include <updater>
+#if defined TF2COLORS
+#include <morecolors>
+#else
 #include <colors>
+#endif
+
 #include <smlib>
 #include <regex>
 
 
 #define PLUGIN_VERSION "1.0"
 
-#define UPDATE_URL ""
+#define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update.txt"
 
 public Plugin:myinfo = 
 {
@@ -28,8 +36,8 @@ new Handle:g_hAdvertFile = INVALID_HANDLE;
 new Handle:g_hAdvertisements = INVALID_HANDLE;
 new Handle:g_hAdvertTimer = INVALID_HANDLE;
 new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
-new Handle:g_hCenterAd[MAXPLAYERS + 1];
 
+new Handle:g_hCenterAd[MAXPLAYERS + 1];
 
 new bool:g_bPluginEnabled;
 new Float:g_fAdvertDelay;
