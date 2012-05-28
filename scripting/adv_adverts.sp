@@ -48,6 +48,7 @@ new bool:g_bTickrate = true;
 new g_iTickrate;
 new g_iFrames = 0;
 new Float:g_fTime;
+new String:g_strConfigPath[PLATFORM_MAX_PATH];
 
 static String:g_tagRawText[14][128] = 
 {
@@ -127,11 +128,14 @@ public OnPluginStart()
 	CreateConVar("sm_extended_advertisements_version", PLUGIN_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	g_hPluginEnabled = CreateConVar("sm_extended_advertisements_enabled", "1", "Is plugin enabled?", 0, true, 0.0, true, 1.0);
 	g_hAdvertDelay = CreateConVar("sm_extended_advertisements_delay", "30.0", "The delay time between each advertisement");
-	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "extended_advertisements.txt", "What is the file name (Located in the 'configs' folder) of the advertisements file");
+	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "configs/extended_advertisements.txt", "What is the file directory of the advertisements file");
 	
 	
 	HookConVarChange(g_hPluginEnabled, OnEnableChange);
 	HookConVarChange(g_hAdvertDelay, OnAdvertDelayChange);
+	HookConVarChange(g_hAdvertFile, OnAdvertFileChange);
+	
+	GetConVarValues();
 	
 	LoadTranslations("extended_advertisements.phrases");
 	
@@ -144,17 +148,17 @@ public OnPluginStart()
 	g_hDynamicTagRegex = CompileRegex("\\{((CONVAR)|(CONVAR_BOOL)):[0-9a-zA-z]{1,}\\}");
 	
 	if (LibraryExists("updater"))
-    {
-        Updater_AddPlugin(UPDATE_URL);
-    }
+	{
+		Updater_AddPlugin(UPDATE_URL);
+	}
 }
 
 public OnLibraryAdded(const String:name[])
 {
-    if (StrEqual(name, "updater"))
-    {
-        Updater_AddPlugin(UPDATE_URL);
-    }
+	if (StrEqual(name, "updater"))
+	{
+		Updater_AddPlugin(UPDATE_URL);
+	}
 }
 
 public OnGameFrame() 
@@ -182,8 +186,7 @@ public OnGameFrame()
 
 public OnConfigsExecuted()
 {
-	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
-	g_fAdvertDelay = GetConVarFloat(g_hAdvertDelay);
+	GetConVarValues();
 	if (g_bPluginEnabled)
 	{
 		if (g_hAdvertTimer != INVALID_HANDLE)
@@ -194,6 +197,16 @@ public OnConfigsExecuted()
 		else
 			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer);
 	}
+}
+
+
+stock GetConVarValues()
+{
+	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
+	g_fAdvertDelay = GetConVarFloat(g_hAdvertDelay);
+	decl String:advertPath[PLATFORM_MAX_PATH];
+	GetConVarString(g_hAdvertFile, advertPath, sizeof(advertPath));
+	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), advertPath);
 }
 
 public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newValue[])
@@ -208,6 +221,13 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 		new Float:advertDelay = StringToFloat(newValue);
 		CreateTimer(float(StringToInt(oldValue)), TimerDelayChange, advertDelay, TIMER_FLAG_NO_MAPCHANGE);
 	}
+}
+
+public OnAdvertFileChange(Handle:conVar, const String:oldValue[], const String:newValue[])
+{
+	decl String:advertPath[PLATFORM_MAX_PATH];
+	strcopy(advertPath, sizeof(advertPath), newValue);
+	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), advertPath);
 }
 
 public Action:TimerDelayChange(Handle:delayTimer, any:advertDelay)
@@ -391,14 +411,14 @@ stock parseAdvertisements()
 		
 		BuildPath(Path_SM, filePath, sizeof(filePath), "configs/%s", conVarFilePath);
 		
-		if (FileExists(filePath)) 
+		if (FileExists(g_strConfigPath)) 
 		{
-			FileToKeyValues(g_hAdvertisements, filePath);
+			FileToKeyValues(g_hAdvertisements, g_strConfigPath);
 			KvGotoFirstSubKey(g_hAdvertisements);
 		} 
 		else 
 		{
-			SetFailState("Advertisement file \"%s\" was not found.", filePath);
+			SetFailState("Advertisement file \"%s\" was not found.", g_strConfigPath);
 		}
 	}
 }
