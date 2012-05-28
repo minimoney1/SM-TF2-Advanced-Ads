@@ -1,0 +1,31 @@
+"Advertisements"
+{
+	"1"
+	{
+		"type"		"C"
+		"text"		"www.domain.com"
+	}
+	"2"
+	{
+		"type"		"CH"
+		"text"		"contact@domain.com"
+	}
+	"3"
+	{
+		"type"		"M"
+		"text"		"Next map is {SM_NEXTMAP} in {TIMELEFT} minutes."
+		"flags"		"cft"
+	}
+	"4"
+	{
+		"type"		"S"
+		"text"		"{GREEN}Current {LIGHTGREEN}Map: {DEFAULT}{CURRENTMAP}"
+		"flags"		"z"
+	}
+	"5"
+	{
+		"type"		"T"
+		"text"		"{ORANGE} Admins: friendly fire is {BOOL:MP_FRIENDLYFIRE}."
+		"flags"		""
+	}
+}

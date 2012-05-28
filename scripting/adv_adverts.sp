@@ -403,13 +403,8 @@ stock parseAdvertisements()
 	if (g_bPluginEnabled)
 	{
 		if (g_hAdvertisements != INVALID_HANDLE)
-			CloseHandle(INVALID_HANDLE);
+			CloseHandle(g_hAdvertisements);
 		g_hAdvertisements = CreateKeyValues("Advertisements");
-		
-		decl String:conVarFilePath[64], String:filePath[PLATFORM_MAX_PATH+32];
-		GetConVarString(g_hAdvertFile, conVarFilePath, sizeof(conVarFilePath));
-		
-		BuildPath(Path_SM, filePath, sizeof(filePath), "configs/%s", conVarFilePath);
 		
 		if (FileExists(g_strConfigPath)) 
 		{
