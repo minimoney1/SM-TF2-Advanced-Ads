@@ -23,7 +23,7 @@
 
 public Plugin:myinfo = 
 {
-	name        = "[TF2] Extended Advertisements",
+	name        = "Extended Advertisements",
 	author      = "Mini",
 	description = "Extended advertisement system for TF2's new color abilities for developers",
 	version     = PLUGIN_VERSION,
