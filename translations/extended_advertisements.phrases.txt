@@ -1,0 +1,11 @@
+"Phrases"
+{
+	"Advert_Tag"
+	{
+		"en"	"[SM]"
+	}
+	"Config_Reloaded"
+	{
+		"en"	"The advertisement config has been reloaded!"
+	}
+}
