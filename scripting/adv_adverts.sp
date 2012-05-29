@@ -238,12 +238,12 @@ public OnExtraColorsPathChange(Handle:conVar, const String:oldValue[], const Str
 {
 	BuildPath(Path_SM, g_strExtraColorsPath, sizeof(g_strExtraColorsPath), newValue);
 }
-
+#endif
 public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
 }
-#endif
+
 public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	if (g_bPluginEnabled)
