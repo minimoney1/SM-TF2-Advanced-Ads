@@ -17,7 +17,7 @@
 #include <regex>
 
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.0.0"
 
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update.txt"
 
