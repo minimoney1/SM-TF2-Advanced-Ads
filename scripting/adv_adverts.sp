@@ -19,7 +19,7 @@
 #include <regex>
 
 
-#define PLUGIN_VERSION "1.0.0-patch"
+#define PLUGIN_VERSION "1.0.1"
 
 #if defined TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -79,7 +79,7 @@ static String:g_strConVarBoolText[2][5] =
 	"ON"
 };
 
-static g_iTColors[13][3]         = 
+static g_iTColors[13][3] = 
 {
 	{255, 255, 255}, 
 	{255, 0, 0},    
@@ -151,7 +151,7 @@ public OnPluginStart()
 	g_hAdvertDelay = CreateConVar("sm_extended_advertisements_delay", "30.0", "The delay time between each advertisement");
 	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "configs/extended_advertisements.txt", "What is the file directory of the advertisements file");
 	#if defined TF2COLORS
-	g_hExtraColorsPath = CreateConVar("sm_extended_advertisements_extracolors_file", "configs/extra_ad_colors.txt");
+	g_hExtraColorsPath = CreateConVar("sm_extended_advertisements_extracolors_file", "configs/extra_ad_colors.txt", "What is the directory of the \"Extra Colrs\" config?");
 	#endif
 	
 	HookConVarChange(g_hPluginEnabled, OnEnableChange);
@@ -216,6 +216,7 @@ public OnConfigsExecuted()
 	#if defined TF2COLORS
 	parseExtraColors();
 	#endif
+	parseAdvertisements();
 	if (g_bPluginEnabled)
 	{
 		if (g_hAdvertTimer != INVALID_HANDLE)
@@ -259,7 +260,7 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 	if (g_bPluginEnabled)
 	{
 		new Float:advertDelay = StringToFloat(newValue);
-		CreateTimer(float(StringToInt(oldValue)), TimerDelayChange, advertDelay, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(StringToFloat(oldValue), TimerDelayChange, advertDelay, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -272,7 +273,8 @@ public Action:TimerDelayChange(Handle:delayTimer, any:advertDelay)
 {
 	if (g_bPluginEnabled)
 	{
-		KillTimer(g_hAdvertTimer);
+		if (g_hAdvertTimer != INVALID_HANDLE)
+			KillTimer(g_hAdvertTimer);
 		g_hAdvertTimer = CreateTimer(advertDelay, AdvertisementTimer, _, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
 	}
 }
@@ -430,6 +432,9 @@ public Action:Command_ReloadAds(client, args)
 {
 	if (Client_IsValid(client) && g_bPluginEnabled)
 	{
+		#if defined TF2COLORS
+		parseExtraColors();
+		#endif
 		parseAdvertisements();
 		Client_PrintToChat(client, true, "%t %t", "Advert_Tag", "Config_Reloaded");
 	}
@@ -476,7 +481,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 				if (conVarFound != INVALID_HANDLE)
 				{
 					new conVarValue = GetConVarInt(conVarFound);
-					if (0 <= conVarValue >= 1)
+					if (conVarValue == 0 || conVarValue == 1)
 						strcopy(tempString, sizeof(tempString), g_strConVarBoolText[conVarValue]);
 					else
 						tempString = "";
