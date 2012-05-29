@@ -6,7 +6,9 @@
 #undef REQUIRE_EXTENSIONS
 #include <steamtools>
 #define REQUIRE_EXTENSIONS
+#undef REQUIRE_PLUGIN
 #include <updater>
+#define REQUIRE_PLUGIN
 #if defined TF2COLORS
 #include <morecolors>
 #else
