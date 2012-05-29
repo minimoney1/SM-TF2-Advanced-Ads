@@ -19,7 +19,7 @@
 #include <regex>
 
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 
 #if defined TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -66,8 +66,9 @@ static String:g_tagRawText[11][24] =
 	"{TIMELEFT}"
 };
 
-static String:g_clientRawText[3][24] =
+static String:g_clientRawText[4][24] =
 {
+	"",
 	"{CLIENT_NAME}",
 	"{CLIENT_STEAMID}",
 	"{CLIENT_IP}"
@@ -510,7 +511,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 		
 		new i = 1;
 		decl String:strTemp[256];
-		if (StrContains(outputText, g_strConVarBoolText[i]) != -1)
+		if (StrContains(outputText, g_tagRawText[i]) != -1)
 		{
 			GetServerIP(strTemp, sizeof(strTemp));
 			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);

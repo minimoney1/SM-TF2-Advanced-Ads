@@ -4,10 +4,11 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.0.1"
+			"Latest"	"1.0.2"
 		}
 		
-		"Notes"	"Fixed major bugs and plugin not parsing the config"
+		"Notes"	"Fixed tag replace bug"
+		"Notes"	"Fixed bugs with array being out of bounds"
 	}
 	
 	"Files"
