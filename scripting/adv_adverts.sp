@@ -21,15 +21,6 @@
 
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update.txt"
 
-public Plugin:myinfo = 
-{
-	name        = "Extended Advertisements",
-	author      = "Mini",
-	description = "Extended advertisement system for TF2's new color abilities for developers",
-	version     = PLUGIN_VERSION,
-	url         = "http://forums.alliedmods.net/"
-};
-
 new Handle:g_hPluginEnabled = INVALID_HANDLE;
 new Handle:g_hAdvertDelay = INVALID_HANDLE;
 new Handle:g_hAdvertFile = INVALID_HANDLE;
@@ -54,7 +45,7 @@ new g_iFrames = 0;
 new Float:g_fTime;
 new String:g_strConfigPath[PLATFORM_MAX_PATH];
 
-static String:g_tagRawText[14][128] = 
+static String:g_tagRawText[11][24] = 
 {
 	"",
 	"{IP}",
@@ -66,13 +57,17 @@ static String:g_tagRawText[14][128] =
 	"{SERVER_TIME}",
 	"{SERVER_TIME24}",
 	"{SERVER_DATE}",
-	"{TIMELEFT}",
+	"{TIMELEFT}"
+};
+
+static String:g_clientRawText[3][24] =
+{
 	"{CLIENT_NAME}",
 	"{CLIENT_STEAMID}",
 	"{CLIENT_IP}"
 };
 
-static String:g_strConVarBoolText[_:2][5] =
+static String:g_strConVarBoolText[2][5] =
 {
 	"OFF",
 	"ON"
@@ -109,6 +104,15 @@ static String:g_sTColors[13][12] =
 	"{LIME}",      
 	"{VIOLET}",    
 	"{LIGHTBLUE}"
+};
+
+public Plugin:myinfo = 
+{
+	name        = "Extended Advertisements",
+	author      = "Mini",
+	description = "Extended advertisement system for TF2's new color abilities for developers",
+	version     = PLUGIN_VERSION,
+	url         = "http://forums.alliedmods.net/"
 };
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
@@ -570,25 +574,25 @@ stock ReplaceClientText(client, const String:inputText[], String:outputText[], o
 {
 	if (Client_IsValid(client) && g_bPluginEnabled)
 	{
-		new i = 11;
+		new i = 1;
 		decl String:strTemp[256];
 		strcopy(outputText, outputText_maxLength, inputText);
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
+		if (StrContains(outputText, g_clientRawText[i]) != -1)
 		{
 			GetClientName(client, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp);
 		}
 		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
+		if (StrContains(outputText, g_clientRawText[i]) != -1)
 		{
 			GetClientAuthString(client, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp);
 		}
 		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
+		if (StrContains(outputText, g_clientRawText[i]) != -1)
 		{
 			GetClientIP(client, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp);
 		}
 		strTemp[0] = '\0';
 	}

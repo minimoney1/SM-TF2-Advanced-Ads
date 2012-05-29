@@ -1,4 +1,4 @@
-*.doc  diff=astextplain
+﻿*.doc  diff=astextplain
 *.DOC	diff=astextplain
 *.docx	diff=astextplain
 *.DOCX	diff=astextplain
@@ -12,6 +12,7 @@
 *.jpg  	binary
 *.png 	binary
 *.gif 	binary
+*.smx binary
 
 *.cs text=auto diff=csharp 
 *.vb text=auto
