@@ -4,15 +4,27 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.0.0"
+			"Latest"	"1.0.0-patch"
+			"Previous"	"1.0.0"
 		}
 		
-		"Notes"	"Initial Version"
+		"Notes"	"Fixed bug in the configs"
 	}
 	
 	"Files"
 	{
+		"Patch"
+		{
+			"Plugin"	"Path_SM/plugins/adv_adverts_tf2.smx"
+			"Plugin"	"Path_SM/configs/extra_ad_colors.txt"
+			
+			"Source"	"Path_SM/scripting/adv_adverts.sp"
+		}
+	
 		"Plugin"	"Path_SM/plugins/adv_adverts_tf2.smx"
+		"Plugin"	"Path_SM/translations/extended_advertisements.phrases.txt"
+		"Plugin"	"Path_SM/configs/extended_advertisements.txt"
+		"Plugin"	"Path_SM/configs/extra_ad_colors.txt"
 		
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
 	}

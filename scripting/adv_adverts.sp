@@ -19,7 +19,7 @@
 #include <regex>
 
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.0-patch"
 
 #if defined TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -144,14 +144,14 @@ public OnPluginStart()
 	#if defined TF2COLORS
 	decl String:gameFolderName[12];
 	GetGameFolderName(gameFolderName, sizeof(gameFolderName));
-	if (!StrEqual(gameFolderName, "tf", false))
+	if ((!StrEqual(gameFolderName, "tf", false)) && (!StrEqual(gameFolderName, "tf_beta", false)))
 		SetFailState("[Extended Advertisements] You are running a version of this plugin that is incompatible with your game.");
 	#endif
 	g_hPluginEnabled = CreateConVar("sm_extended_advertisements_enabled", "1", "Is plugin enabled?", 0, true, 0.0, true, 1.0);
 	g_hAdvertDelay = CreateConVar("sm_extended_advertisements_delay", "30.0", "The delay time between each advertisement");
 	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "configs/extended_advertisements.txt", "What is the file directory of the advertisements file");
 	#if defined TF2COLORS
-	g_hExtraColorsPath = CreateConVar("sm_extended_advertisements_extracolors_file", "configs/extra_colors.txt");
+	g_hExtraColorsPath = CreateConVar("sm_extended_advertisements_extracolors_file", "configs/extra_ad_colors.txt");
 	#endif
 	
 	HookConVarChange(g_hPluginEnabled, OnEnableChange);
