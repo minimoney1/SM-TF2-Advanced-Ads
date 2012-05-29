@@ -1,0 +1,19 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.0.0"
+		}
+		
+		"Notes"	"Initial Version"
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/adv_adverts_tf2.smx"
+		
+		"Source"	"Path_SM/scripting/adv_adverts_tf2.sp"
+	}
+}

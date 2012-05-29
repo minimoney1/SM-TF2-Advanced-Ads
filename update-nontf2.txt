@@ -12,8 +12,8 @@
 	
 	"Files"
 	{
-		"Plugin"	"Path_SM/plugins/adv_adverts.smx"
+		"Plugin"	"Path_SM/plugins/adv_adverts_nontf2.smx"
 		
-		"Source"	"Path_SM/scripting/adv_adverts.sp"
+		"Source"	"Path_SM/scripting/adv_adverts_nontf2.sp"
 	}
 }
