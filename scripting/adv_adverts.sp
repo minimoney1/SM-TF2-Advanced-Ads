@@ -36,6 +36,10 @@ new Handle:g_hAdvertFile = INVALID_HANDLE;
 new Handle:g_hAdvertisements = INVALID_HANDLE;
 new Handle:g_hAdvertTimer = INVALID_HANDLE;
 new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
+#if defined TF2COLORS
+new Handle:g_hExtraColorsPath = INVALID_HANDLE;
+new String:g_strExtraColorsPath[PLATFORM_MAX_PATH];
+#endif
 
 new Handle:g_hCenterAd[MAXPLAYERS + 1];
 
@@ -126,14 +130,26 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 public OnPluginStart()
 {
 	CreateConVar("sm_extended_advertisements_version", PLUGIN_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	
+	#if defined TF2COLORS
+	decl String:gameFolderName[12];
+	GetGameFolderName(gameFolderName, sizeof(gameFolderName));
+	if (!StrEqual(gameFolderName, "tf", false))
+		SetFailState("[Extended Advertisements] You are running a version of this plugin that is incompatible with your game.");
+	#endif
 	g_hPluginEnabled = CreateConVar("sm_extended_advertisements_enabled", "1", "Is plugin enabled?", 0, true, 0.0, true, 1.0);
 	g_hAdvertDelay = CreateConVar("sm_extended_advertisements_delay", "30.0", "The delay time between each advertisement");
 	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "configs/extended_advertisements.txt", "What is the file directory of the advertisements file");
-	
+	#if defined TF2COLORS
+	g_hExtraColorsPath = CreateConVar("sm_extended_advertisements_extracolors_file", "configs/extra_colors.txt");
+	#endif
 	
 	HookConVarChange(g_hPluginEnabled, OnEnableChange);
 	HookConVarChange(g_hAdvertDelay, OnAdvertDelayChange);
 	HookConVarChange(g_hAdvertFile, OnAdvertFileChange);
+	#if defined TF2COLORS
+	HookConVarChange(g_hExtraColorsPath, OnExtraColorsPathChange);
+	#endif
 	
 	GetConVarValues();
 	
@@ -187,6 +203,9 @@ public OnGameFrame()
 public OnConfigsExecuted()
 {
 	GetConVarValues();
+	#if defined TF2COLORS
+	parseExtraColors();
+	#endif
 	if (g_bPluginEnabled)
 	{
 		if (g_hAdvertTimer != INVALID_HANDLE)
@@ -207,13 +226,24 @@ stock GetConVarValues()
 	decl String:advertPath[PLATFORM_MAX_PATH];
 	GetConVarString(g_hAdvertFile, advertPath, sizeof(advertPath));
 	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), advertPath);
+	#if defined TF2COLORS
+	decl String:extraColorPath[PLATFORM_MAX_PATH];
+	GetConVarString(g_hExtraColorsPath, extraColorPath, sizeof(extraColorPath));
+	BuildPath(Path_SM, g_strExtraColorsPath, sizeof(g_strExtraColorsPath), extraColorPath);
+	#endif
+}
+
+#if defined TF2COLORS
+public OnExtraColorsPathChange(Handle:conVar, const String:oldValue[], const String:newValue[])
+{
+	BuildPath(Path_SM, g_strExtraColorsPath, sizeof(g_strExtraColorsPath), newValue);
 }
 
 public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
 }
-
+#endif
 public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	if (g_bPluginEnabled)
@@ -225,9 +255,7 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 
 public OnAdvertFileChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
-	decl String:advertPath[PLATFORM_MAX_PATH];
-	strcopy(advertPath, sizeof(advertPath), newValue);
-	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), advertPath);
+	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), newValue);
 }
 
 public Action:TimerDelayChange(Handle:delayTimer, any:advertDelay)
@@ -262,7 +290,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			flagBits = -1;
 		if (StrContains(sType, "C") != -1) 
 		{
-			CRemoveTags(sBuffer, sizeof(sBuffer));
+			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
 				if (Client_CanViewAds(client, flagBits))
@@ -280,7 +308,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		}
 		if (StrContains(sType, "H") != -1) 
 		{
-			CRemoveTags(sBuffer, sizeof(sBuffer));
+			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
 				if (Client_CanViewAds(client, flagBits))
@@ -297,7 +325,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			DrawPanelText(hPl, sBuffer);
 			SetPanelCurrentKey(hPl, 10);
 			
-			CRemoveTags(sBuffer, sizeof(sBuffer));
+			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{	
 				if (Client_CanViewAds(client, flagBits))
@@ -340,7 +368,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				iColor   = 0;
 			}
 			
-			CRemoveTags(sBuffer, sizeof(sBuffer));
+			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			
 			new Handle:hKv = CreateKeyValues("Stuff", "title", sBuffer[iPos]);
 			KvSetColor(hKv, "color", g_iTColors[iColor][0], g_iTColors[iColor][1], g_iTColors[iColor][2], 255);
@@ -433,9 +461,16 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 			{
 				ReplaceString(tempString, sizeof(tempString), "{CONVAR_BOOL:", "");
 				ReplaceString(tempString, sizeof(tempString), "}", "");
+				String_ToLower(tempString, tempString, sizeof(tempString));
 				new Handle:conVarFound = FindConVar(tempString);
 				if (conVarFound != INVALID_HANDLE)
-					strcopy(tempString, sizeof(tempString), g_strConVarBoolText[GetConVarBool(conVarFound)]);
+				{
+					new conVarValue = GetConVarInt(conVarFound);
+					if (0 <= conVarValue >= 1)
+						strcopy(tempString, sizeof(tempString), g_strConVarBoolText[conVarValue]);
+					else
+						tempString = "";
+				}
 				else
 					tempString = "";
 				ReplaceString(outputText, outputText_maxLength, matchedTag, tempString);
@@ -444,6 +479,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 			{
 				ReplaceString(tempString, sizeof(tempString), "{CONVAR:", "");
 				ReplaceString(tempString, sizeof(tempString), "}", "");
+				String_ToLower(tempString, tempString, sizeof(tempString));
 				new Handle:conVarFound = FindConVar(tempString);
 				if (conVarFound != INVALID_HANDLE)
 				{
@@ -575,4 +611,44 @@ stock bool:Client_CanViewAds(client, clientFlagBits)
 	if (CheckCommandAccess(client, "extended_advert", clientFlagBits) || CheckCommandAccess(client, "extended_adverts", ADMFLAG_ROOT))
 		return true;
 	return false;
+}
+
+#if defined TF2COLORS
+stock parseExtraColors()
+{
+	if (g_bPluginEnabled)
+	{
+		if (FileExists(g_strExtraColorsPath)) 
+		{
+			new Handle:keyValues = CreateKeyValues("Extra Colors");
+			FileToKeyValues(keyValues, g_strExtraColorsPath);
+			KvGotoFirstSubKey(keyValues);
+			decl String:colorName[128], hex;
+			do
+			{
+				KvGetSectionName(keyValues, colorName, sizeof(colorName));
+				hex = KvGetNum(keyValues, "hex", 0);
+				if (hex != 0)
+					CAddColor(colorName, hex);
+			}
+			while (KvGotoNextKey(keyValues));
+			KvRewind(keyValues);
+		}
+	}
+}
+#endif
+
+stock String_RemoveExtraTags(String:inputString[], inputString_maxLength)
+{
+	CRemoveTags(inputString, inputString_maxLength);
+	for (new i = 1; i < sizeof(g_tagRawText); i++)
+	{
+		if (StrContains(inputString, g_tagRawText[i], false))
+			ReplaceString(inputString, inputString_maxLength, g_tagRawText[i], "", false);
+	}
+	for (new x = 0; x < sizeof(g_sTColors); x++)
+	{
+		if (StrContains(inputString, g_sTColors[x], false))
+			ReplaceString(inputString, inputString_maxLength, g_sTColors[x], "", false);
+	}
 }
