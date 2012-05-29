@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-#define TF2COLORS
+//#define TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -19,7 +19,11 @@
 
 #define PLUGIN_VERSION "1.0.0"
 
+#if defined TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
+#else
+#define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-nontf2.txt"
+#endif
 
 new Handle:g_hPluginEnabled = INVALID_HANDLE;
 new Handle:g_hAdvertDelay = INVALID_HANDLE;
