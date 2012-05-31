@@ -20,5 +20,6 @@
 		"Plugin"	"Path_SM/configs/extra_tsay_colors.txt"
 
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
+		"Source"	"Path_SM/scripting/include/extended_adverts.inc"
 	}
 }

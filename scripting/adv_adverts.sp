@@ -187,7 +187,7 @@ public OnPluginStart()
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
 	
-	g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):.{1,}\\}");
+	g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
@@ -479,7 +479,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				first++;
 				last--;
 				for (new j = 0; j <= last - first + 1; j++) 
-				{ // everything from this point on is really confusing
+				{
 					if (j == last - first + 1) 
 					{
 						part[j] = 0;
@@ -495,7 +495,6 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 					ReplaceString(sBuffer, sizeof(sBuffer), find, "", false);
 				}
 			}
-			
 			else
 			{
 				GetTrieArray(g_hTopColorTrie, "white", value, 4);
@@ -594,6 +593,7 @@ public Action:Command_ReloadAds(client, args)
 		#endif
 		if (g_hTopColorTrie != INVALID_HANDLE)
 			ClearTrie(g_hTopColorTrie);
+		initTopColorTrie();
 		parseExtraTopColors();
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
@@ -624,48 +624,62 @@ stock parseAdvertisements()
 stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_maxLength)
 {
 	strcopy(outputText, outputText_maxLength, inputText);
-	new dynamicTagCount = MatchRegex(g_hDynamicTagRegex, outputText);
-	if (dynamicTagCount > 0)
+	decl String:part[256], String:find[128], String:replace[128];
+	new first, last;
+	new index = 0;
+	for (new i = 0; i < 100; i++) 
 	{
-		decl String:matchedTag[64], String:tempString[64];
-		new Handle:conVarFound;
-		for (new i = 0; i < dynamicTagCount; i++)
+		first = FindCharInString(outputText[index], '{');
+		last = FindCharInString(outputText[index], '}');
+		if (first != -1 || last != -1)
 		{
-			GetRegexSubString(g_hDynamicTagRegex, i, matchedTag, sizeof(matchedTag));
-			strcopy(tempString, sizeof(tempString), matchedTag);
-			if (StrContains(tempString, "CONVAR_BOOL", false) != -1)
+			for (new j = 0; j <= last - first + 1; j++) 
 			{
-				ReplaceString(tempString, sizeof(tempString), "{CONVAR_BOOL:", "", false);
-				ReplaceString(tempString, sizeof(tempString), "}", "", false);
-				conVarFound = FindConVar(tempString);
-				if (conVarFound != INVALID_HANDLE)
+				if (j == last - first + 1) 
 				{
-					new conVarValue = GetConVarInt(conVarFound);
-					if (conVarValue == 0 || conVarValue == 1)
-						strcopy(tempString, sizeof(tempString), g_strConVarBoolText[conVarValue]);
-					else
-						tempString = "";
+					part[j] = 0;
+					PrintToChatAll("Part = %s", part);
+					break;
 				}
-				else
-					tempString = "";
-				ReplaceString(outputText, outputText_maxLength, matchedTag, tempString);
+				part[j] = outputText[index + first + j];
 			}
-			else
+			index += last + 1;
+			if (MatchRegex(g_hDynamicTagRegex, part) > 0)
 			{
-				ReplaceString(tempString, sizeof(tempString), "{CONVAR:", "", false);
-				ReplaceString(tempString, sizeof(tempString), "}", "", false);
-				conVarFound = FindConVar(tempString);
-				if (conVarFound != INVALID_HANDLE)
+				GetRegexSubString(g_hDynamicTagRegex, 0, find, sizeof(find));
+				strcopy(replace, sizeof(replace), find);
+				new Handle:conVarFound = INVALID_HANDLE;
+				if (StrContains(replace, "CONVAR_BOOL", false) != -1)
 				{
-					decl String:strConVarValue[64];
-					GetConVarString(conVarFound, strConVarValue, sizeof(strConVarValue));
-					strcopy(tempString, sizeof(tempString), strConVarValue);
+					ReplaceString(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
+					ReplaceString(replace, sizeof(replace), "}", "", false);
+					conVarFound = FindConVar(replace);
+					if (conVarFound != INVALID_HANDLE)
+					{
+						new conVarValue = GetConVarInt(conVarFound);
+						if (conVarValue == 0 || conVarValue == 1)
+							strcopy(replace, sizeof(replace), g_strConVarBoolText[conVarValue]);
+						else
+							replace = "";
+					}
+					else
+						replace = "";
 				}
 				else
-					tempString = "";
-				ReplaceString(outputText, outputText_maxLength, matchedTag, tempString);
+				{
+					ReplaceString(replace, sizeof(replace), "{CONVAR:", "", false);
+					ReplaceString(replace, sizeof(replace), "}", "", false);
+					conVarFound = FindConVar(replace);
+					if (conVarFound != INVALID_HANDLE)
+						GetConVarString(conVarFound, replace, sizeof(replace));
+					else
+						replace = "";
+				}
+				ReplaceString(outputText, outputText_maxLength, find, replace);
 			}
 		}
+		else
+			break;
 	}
 	
 	new i = 1;
@@ -888,8 +902,10 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 	decl String:part[256], String:find[32];
 	new value[4], first, last;
 	new index = 0;
+	new bool:result = false;
 	for (new i = 0; i < 100; i++) 
 	{
+		result = false;
 		first = FindCharInString(input[index], '{');
 		last = FindCharInString(input[index], '}');
 		if (first == -1 || last == -1) 
@@ -910,24 +926,22 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 		index += last + 2;
 		String_ToLower(part, part, sizeof(part));
 		#if defined ADVERT_TF2COLORS
-		if (ignoreChat && GetTrieValue(CTrie, part, 0))
-			continue;
+		new value_ex;
+		if (ignoreChat && (GetTrieValue(CTrie, part, value_ex) || !strcmp(part, "default", false) || !strcmp(part, "teamcolor", false)))
+			result = true;
 		#else
 		if (ignoreChat)
 		{
 			decl String:colorTag[64];
 			for (new x = 0; x < sizeof(CTag); x++)
 			{
-				strcopy(colorTag, sizeof(colorTag), CTag[x]);
-				ReplaceString(colorTag, sizeof(colorTag), "{", "", false);
-				ReplaceString(colorTag, sizeof(colorTag), "}", "", false);
-				new result = StrEqual(part, colorTag, false);
-				if (result)
-					continue;
+				Format(colorTag, sizeof(colorTag), "{%s}", CTag[x]);
+				if (StrContains(part, colorTag, false) != -1)
+					result = true;
 			}
 		}
 		#endif
-		if (GetTrieArray(g_hTopColorTrie, part, value, 4) == true) 
+		if (GetTrieArray(g_hTopColorTrie, part, value, 4) && !result) 
 		{
 			Format(find, sizeof(find), "{%s}", part);
 			ReplaceString(input, maxlength, find, "", false);
@@ -960,7 +974,6 @@ stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:i
 stock Server_GetIPNumString(String:ipBuffer[], ipBuffer_maxLength, bool:useSteamTools)
 {
 	new ip;
-	PrintToChatAll("SteamTools: %d", useSteamTools);
 	switch (useSteamTools)
 	{
 		case true:
