@@ -1,6 +1,6 @@
 // This file will not function if your server is not a TF2 server
 // TF2 is the only mod (as of now) that has support for extra custom colors
-"Extra Colors"
+"Extra Chat Colors"
 {
 	"palepink" //The name of the color without the "{" and "}" tags.
 	{

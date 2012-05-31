@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-//#define TF2COLORS
+//#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -9,19 +9,18 @@
 #undef REQUIRE_PLUGIN
 #include <updater>
 #define REQUIRE_PLUGIN
-#if defined TF2COLORS
+#if defined ADVERT_TF2COLORS
 #include <morecolors>
 #else
 #include <colors>
 #endif
-
-#include <smlib>
 #include <regex>
+#include <smlib>
+#include <extended_adverts>
 
+#define PLUGIN_VERSION "1.1.0"
 
-#define PLUGIN_VERSION "1.0.2"
-
-#if defined TF2COLORS
+#if defined ADVERT_TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
 #else
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-nontf2.txt"
@@ -33,16 +32,26 @@ new Handle:g_hAdvertFile = INVALID_HANDLE;
 new Handle:g_hAdvertisements = INVALID_HANDLE;
 new Handle:g_hAdvertTimer = INVALID_HANDLE;
 new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
-#if defined TF2COLORS
-new Handle:g_hExtraColorsPath = INVALID_HANDLE;
-new String:g_strExtraColorsPath[PLATFORM_MAX_PATH];
+new Handle:g_hExitPanel = INVALID_HANDLE;
+new Handle:g_hExtraTopColorsPath = INVALID_HANDLE;
+#if defined ADVERT_TF2COLORS
+new Handle:g_hExtraChatColorsPath = INVALID_HANDLE;
+new String:g_strExtraChatColorsPath[PLATFORM_MAX_PATH];
 #endif
 
 new Handle:g_hCenterAd[MAXPLAYERS + 1];
 
-new bool:g_bPluginEnabled;
+new Handle:g_hTopColorTrie = INVALID_HANDLE;
+
+new Handle:g_hForwardPreReplace,
+	Handle:g_hForwardPreClientReplace,
+	Handle:g_hForwardPostAdvert;
+
+new bool:g_bPluginEnabled,
+	bool:g_bExitPanel,
+	bool:g_bUseSteamTools;
+
 new Float:g_fAdvertDelay;
-new bool:g_bUseSteamTools;
 
 
 new bool:g_bTickrate = true;
@@ -50,6 +59,7 @@ new g_iTickrate;
 new g_iFrames = 0;
 new Float:g_fTime;
 new String:g_strConfigPath[PLATFORM_MAX_PATH];
+new String:g_strExtraTopColorsPath[PLATFORM_MAX_PATH];
 
 static String:g_tagRawText[11][24] = 
 {
@@ -66,51 +76,21 @@ static String:g_tagRawText[11][24] =
 	"{TIMELEFT}"
 };
 
-static String:g_clientRawText[4][24] =
+static String:g_clientRawText[7][32] =
 {
 	"",
 	"{CLIENT_NAME}",
 	"{CLIENT_STEAMID}",
-	"{CLIENT_IP}"
+	"{CLIENT_IP}",
+	"{CLIENT_FULLIP}",
+	"{CLIENT_CONNECTION_SECONDS}",
+	"{CLIENT_MAPTIME}"
 };
 
 static String:g_strConVarBoolText[2][5] =
 {
 	"OFF",
 	"ON"
-};
-
-static g_iTColors[13][3] = 
-{
-	{255, 255, 255}, 
-	{255, 0, 0},    
-	{0, 255, 0}, 
-	{0, 0, 255}, 
-	{255, 255, 0}, 
-	{255, 0, 255}, 
-	{0, 255, 255}, 
-	{255, 128, 0}, 
-	{255, 0, 128}, 
-	{128, 255, 0}, 
-	{0, 255, 128}, 
-	{128, 0, 255}, 
-	{0, 128, 255}
-};
-static String:g_sTColors[13][12] = 
-{
-	"{WHITE}",       
-	"{RED}",        
-	"{GREEN}",   
-	"{BLUE}",    
-	"{YELLOW}",    
-	"{PURPLE}",    
-	"{CYAN}",      
-	"{ORANGE}",    
-	"{PINK}",      
-	"{OLIVE}",     
-	"{LIME}",      
-	"{VIOLET}",    
-	"{LIGHTBLUE}"
 };
 
 public Plugin:myinfo = 
@@ -124,25 +104,51 @@ public Plugin:myinfo =
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
-	switch (GetExtensionFileStatus("steamtools.ext"))
-	{
-		case 1:
-		{
-			g_bUseSteamTools = true;
-		}
-		default:
-		{
-			g_bUseSteamTools = false;
-		}
-	}
+	RegPluginLibrary("adv_adverts");
+	MarkNativeAsOptional("Steam_GetPublicIP");
+	CreateNative("AddExtraTopColor", AddTopColorToTrie);
+	CreateNative("Client_CanViewAds", CanViewAdvert);
+	#if defined ADVERT_TF2COLORS
+	CreateNative("AddExtraChatColor", AddChatColorToTrie);
+	#endif
 	return APLRes_Success;
 }
+
+public AddTopColorToTrie(Handle:plugin, numParams)
+{
+	decl String:colorName[128], colorName_maxLength;
+	GetNativeStringLength(1, colorName_maxLength);
+	GetNativeString(1, colorName, colorName_maxLength);
+	new red = GetNativeCell(2),
+		blue = GetNativeCell(3),
+		green = GetNativeCell(4),
+		alpha = GetNativeCell(5);
+	new bool:replace = GetNativeCell(6) ? true : false;
+	new color[4];
+	color[0] = red;
+	color[1] = blue;
+	color[2] = green;
+	color[3] = alpha;
+	return SetTrieArray(g_hTopColorTrie, colorName, color, 4, replace);
+}
+
+#if defined ADVERT_TF2COLORS
+public AddChatColorToTrie(Handle:plugin, numParams)
+{
+	decl String:colorName[128], colorName_maxLength;
+	GetNativeStringLength(1, colorName_maxLength);
+	GetNativeString(1, colorName, colorName_maxLength);
+	new hex = GetNativeCell(2);
+	
+	return CAddColor(colorName, hex);
+}
+#endif
 
 public OnPluginStart()
 {
 	CreateConVar("extended_advertisements_version", PLUGIN_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
-	#if defined TF2COLORS
+	#if defined ADVERT_TF2COLORS
 	decl String:gameFolderName[12];
 	GetGameFolderName(gameFolderName, sizeof(gameFolderName));
 	if ((!StrEqual(gameFolderName, "tf", false)) && (!StrEqual(gameFolderName, "tf_beta", false)))
@@ -151,28 +157,39 @@ public OnPluginStart()
 	g_hPluginEnabled = CreateConVar("sm_extended_advertisements_enabled", "1", "Is plugin enabled?", 0, true, 0.0, true, 1.0);
 	g_hAdvertDelay = CreateConVar("sm_extended_advertisements_delay", "30.0", "The delay time between each advertisement");
 	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "configs/extended_advertisements.txt", "What is the file directory of the advertisements file");
-	#if defined TF2COLORS
-	g_hExtraColorsPath = CreateConVar("sm_extended_advertisements_extracolors_file", "configs/extra_ad_colors.txt", "What is the directory of the \"Extra Colrs\" config?");
+	g_hExitPanel = CreateConVar("sm_extended_advertisements_exitmenu", "1", "In \"M\" type menus, can clients close the menu with the press of any button?");
+	g_hExtraTopColorsPath = CreateConVar("sm_extended_advertisement_extratopcolors_file", "configs/extra_top_colors.txt", "What is the directory of the \"Extra Top Colors\" config?");
+	#if defined ADVERT_TF2COLORS
+	g_hExtraChatColorsPath = CreateConVar("sm_extended_advertisements_extrachatcolors_file", "configs/extra_chat_colors.txt", "What is the directory of the \"Extra Chat Colors\" config?");
 	#endif
 	
 	HookConVarChange(g_hPluginEnabled, OnEnableChange);
 	HookConVarChange(g_hAdvertDelay, OnAdvertDelayChange);
 	HookConVarChange(g_hAdvertFile, OnAdvertFileChange);
-	#if defined TF2COLORS
-	HookConVarChange(g_hExtraColorsPath, OnExtraColorsPathChange);
+	HookConVarChange(g_hExitPanel, OnExitChange);
+	HookConVarChange(g_hExtraTopColorsPath, OnExtraTopColorsPathChange);
+	#if defined ADVERT_TF2COLORS
+	HookConVarChange(g_hExtraChatColorsPath, OnExtraChatColorsPathChange);
 	#endif
 	
-	GetConVarValues();
+	InitiConfiguration();
 	
 	LoadTranslations("extended_advertisements.phrases");
 	
 	
-	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_ROOT);
+	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_ROOT);
 	
 	
 	AutoExecConfig();
 	
-	g_hDynamicTagRegex = CompileRegex("\\{((CONVAR)|(CONVAR_BOOL)):[0-9a-zA-z]{1,}\\}");
+	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
+	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
+	
+	g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):.{1,}\\}");
+	
+	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
 	if (LibraryExists("updater"))
 	{
@@ -186,6 +203,18 @@ public OnLibraryAdded(const String:name[])
 	{
 		Updater_AddPlugin(UPDATE_URL);
 	}
+	
+	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
+}
+
+public OnLibraryRemoved(const String:name[])
+{
+	if (StrEqual(name, "updater"))
+	{
+		Updater_RemovePlugin();
+	}
+	
+	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 }
 
 public OnGameFrame() 
@@ -213,10 +242,11 @@ public OnGameFrame()
 
 public OnConfigsExecuted()
 {
-	GetConVarValues();
-	#if defined TF2COLORS
-	parseExtraColors();
+	InitiConfiguration();
+	#if defined ADVERT_TF2COLORS
+	parseExtraChatColors();
 	#endif
+	parseExtraTopColors();
 	parseAdvertisements();
 	if (g_bPluginEnabled)
 	{
@@ -231,82 +261,122 @@ public OnConfigsExecuted()
 }
 
 
-stock GetConVarValues()
+stock InitiConfiguration()
 {
 	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
 	g_fAdvertDelay = GetConVarFloat(g_hAdvertDelay);
+	g_bExitPanel = GetConVarBool(g_hExitPanel);
+	
 	decl String:advertPath[PLATFORM_MAX_PATH];
 	GetConVarString(g_hAdvertFile, advertPath, sizeof(advertPath));
 	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), advertPath);
-	#if defined TF2COLORS
-	decl String:extraColorPath[PLATFORM_MAX_PATH];
-	GetConVarString(g_hExtraColorsPath, extraColorPath, sizeof(extraColorPath));
-	BuildPath(Path_SM, g_strExtraColorsPath, sizeof(g_strExtraColorsPath), extraColorPath);
+	
+	GetConVarString(g_hExtraTopColorsPath, advertPath, sizeof(advertPath));
+	BuildPath(Path_SM, g_strExtraTopColorsPath, sizeof(g_strExtraTopColorsPath), advertPath);
+	
+	#if defined ADVERT_TF2COLORS
+	GetConVarString(g_hExtraChatColorsPath, advertPath, sizeof(advertPath));
+	BuildPath(Path_SM, g_strExtraChatColorsPath, sizeof(g_strExtraChatColorsPath), advertPath);
 	#endif
+	initTopColorTrie();
 }
 
-#if defined TF2COLORS
-public OnExtraColorsPathChange(Handle:conVar, const String:oldValue[], const String:newValue[])
+public OnExtraTopColorsPathChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
-	BuildPath(Path_SM, g_strExtraColorsPath, sizeof(g_strExtraColorsPath), newValue);
+	BuildPath(Path_SM, g_strExtraTopColorsPath, sizeof(g_strExtraTopColorsPath), newValue);
+	if (g_hTopColorTrie != INVALID_HANDLE)
+		ClearTrie(g_hTopColorTrie);
+	parseExtraTopColors();
+}
+
+public OnExitChange(Handle:conVar, const String:oldValue[], const String:newValue[])
+{
+	g_bExitPanel = StringToInt(newValue) ? true : false;
+}
+
+#if defined ADVERT_TF2COLORS
+public OnExtraChatColorsPathChange(Handle:conVar, const String:oldValue[], const String:newValue[])
+{
+	BuildPath(Path_SM, g_strExtraChatColorsPath, sizeof(g_strExtraChatColorsPath), newValue);
+	parseExtraChatColors();
 }
 #endif
 public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
-	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
+	g_bPluginEnabled = StringToInt(newValue) ? true : false;
 }
 
 public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
-	if (g_bPluginEnabled)
-	{
-		new Float:advertDelay = StringToFloat(newValue);
-		CreateTimer(StringToFloat(oldValue), TimerDelayChange, advertDelay, TIMER_FLAG_NO_MAPCHANGE);
-	}
+	g_fAdvertDelay = StringToFloat(newValue);
+	if (g_hAdvertTimer != INVALID_HANDLE)
+		KillTimer(g_hAdvertTimer);
+	g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
 }
 
 public OnAdvertFileChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), newValue);
-}
-
-public Action:TimerDelayChange(Handle:delayTimer, any:advertDelay)
-{
-	if (g_bPluginEnabled)
-	{
-		if (g_hAdvertTimer != INVALID_HANDLE)
-			KillTimer(g_hAdvertTimer);
-		g_hAdvertTimer = CreateTimer(advertDelay, AdvertisementTimer, _, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
-	}
+	if (g_hAdvertisements != INVALID_HANDLE)
+		CloseHandle(g_hAdvertisements);
+	parseAdvertisements();
 }
 
 public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
-		decl String:sFlags[16], String:sText[256], String:sType[6], String:sBuffer[256];
+		decl String:sFlags[16], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128];
 		new flagBits = -1;
 		
+		KvGetSectionName(g_hAdvertisements, sectionName, sizeof(sectionName));
 		KvGetString(g_hAdvertisements, "type",  sType,  sizeof(sType));
 		KvGetString(g_hAdvertisements, "text",  sText,  sizeof(sText));
 		KvGetString(g_hAdvertisements, "flags", sFlags, sizeof(sFlags), "none");
 		
+		if (!KvGotoNextKey(g_hAdvertisements)) 
+		{
+			KvRewind(g_hAdvertisements);
+			KvGotoFirstSubKey(g_hAdvertisements);
+		}
 		
-		ReplaceAdText(sText, sText, sizeof(sText));
-		
-		strcopy(sBuffer, sizeof(sBuffer), sText);
 		if (!StrEqual(sFlags, "none"))
 		{
 			flagBits = ReadFlagString(sFlags);
 		}
 		else
 			flagBits = -1;
-		if (StrContains(sType, "C") != -1) 
+		
+		
+		new Action:forwardReturn = Plugin_Continue,
+			bool:forwardBool = true;
+		Call_StartForward(g_hForwardPreReplace);
+		Call_PushStringEx(sectionName, sizeof(sectionName), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+		Call_PushStringEx(sType, sizeof(sType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+		Call_PushStringEx(sText, sizeof(sText), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+		Call_PushCellRef(flagBits);
+		Call_Finish(_:forwardReturn);
+		
+		if (forwardReturn != Plugin_Continue)
+			return Plugin_Continue;
+		
+		ReplaceAdText(sText, sText, sizeof(sText));
+		strcopy(sBuffer, sizeof(sBuffer), sText);
+		
+		if (StrContains(sType, "C", false) != -1) 
 		{
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
-				if (Client_CanViewAds(client, flagBits))
+				Call_StartForward(g_hForwardPreClientReplace);
+				Call_PushCell(client);
+				Call_PushString(sectionName);
+				Call_PushString(sType);
+				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+				Call_PushCellRef(flagBits);
+				Call_Finish(_:forwardBool);
+				
+				if (forwardBool && Client_CanViewAds(client, flagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					PrintCenterText(client, sBuffer);	
@@ -317,22 +387,34 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 					
 				}
 			}
-			strcopy(sBuffer, sizeof(sBuffer), sText);
 		}
-		if (StrContains(sType, "H") != -1) 
+		
+		strcopy(sBuffer, sizeof(sBuffer), sText);
+		forwardBool = true;
+		if (StrContains(sType, "H", false) != -1) 
 		{
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
-				if (Client_CanViewAds(client, flagBits))
+				Call_StartForward(g_hForwardPreClientReplace);
+				Call_PushCell(client);
+				Call_PushString(sectionName);
+				Call_PushString(sType);
+				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+				Call_PushCellRef(flagBits);
+				Call_Finish(_:forwardBool);
+				
+				if (forwardBool && Client_CanViewAds(client, flagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					PrintHintText(client, sBuffer);
 				}
 			}
-			strcopy(sBuffer, sizeof(sBuffer), sText);
 		}
-		if (StrContains(sType, "M") != -1) 
+		
+		strcopy(sBuffer, sizeof(sBuffer), sText);
+		forwardBool = true;
+		if (StrContains(sType, "M", false) != -1) 
 		{
 			new Handle:hPl = CreatePanel();
 			DrawPanelText(hPl, sBuffer);
@@ -340,69 +422,137 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
-			{	
-				if (Client_CanViewAds(client, flagBits))
+			{
+				Call_StartForward(g_hForwardPreClientReplace);
+				Call_PushCell(client);
+				Call_PushString(sectionName);
+				Call_PushString(sType);
+				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+				Call_PushCellRef(flagBits);
+				Call_Finish(_:forwardBool);
+				
+				if (forwardBool && Client_CanViewAds(client, flagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					SendPanelToClient(hPl, client, Handler_DoNothing, 10);
 				}
 			}
-			strcopy(sBuffer, sizeof(sBuffer), sText);
 			
 			CloseHandle(hPl);
 		}
-		if (StrContains(sType, "S") != -1) 
+		
+		strcopy(sBuffer, sizeof(sBuffer), sText);
+		forwardBool = true;
+		if (StrContains(sType, "S", false) != -1) 
 		{
+			String_RemoveExtraTags(sBuffer, sizeof(sBuffer), true);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
-				if (Client_CanViewAds(client, flagBits))
+				Call_StartForward(g_hForwardPreClientReplace);
+				Call_PushCell(client);
+				Call_PushString(sectionName);
+				Call_PushString(sType);
+				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+				Call_PushCellRef(flagBits);
+				Call_Finish(_:forwardBool);
+
+				if (forwardBool && Client_CanViewAds(client, flagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					CPrintToChat(client, sBuffer);
 				}
 			}
 		}
-		if (StrContains(sType, "T") != -1) 
+		
+		strcopy(sBuffer, sizeof(sBuffer), sText);
+		forwardBool = true;
+		if (StrContains(sType, "T", false) != -1) 
 		{
-			decl String:sColor[16];
-			new iColor = -1, iPos = BreakString(sText, sColor, sizeof(sColor));
-			
-			for (new i = 0; i < sizeof(g_sTColors); i++) 
+			// Credits go to Dr. Mckay
+			decl String:part[256], String:find[32];
+			new value[4], first, last;
+			new index = 0;
+			first = FindCharInString(sBuffer[index], '{');
+			last = FindCharInString(sBuffer[index], '}');
+			if (first != -1 || last != -1) 
 			{
-				if (StrEqual(sColor, g_sTColors[i])) 
+				first++;
+				last--;
+				for (new j = 0; j <= last - first + 1; j++) 
+				{ // everything from this point on is really confusing
+					if (j == last - first + 1) 
+					{
+						part[j] = 0;
+						break;
+					}
+					part[j] = sBuffer[index + first + j];
+				}
+				index += last + 2;
+				String_ToLower(part, part, sizeof(part));
+				if (GetTrieArray(g_hTopColorTrie, part, value, 4)) 
 				{
-					iColor = i;
+					Format(find, sizeof(find), "{%s}", part);
+					ReplaceString(sBuffer, sizeof(sBuffer), find, "", false);
 				}
 			}
 			
-			if (iColor == -1) 
+			else
 			{
-				iPos     = 0;
-				iColor   = 0;
+				GetTrieArray(g_hTopColorTrie, "white", value, 4);
 			}
 			
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			
-			new Handle:hKv = CreateKeyValues("Stuff", "title", sBuffer[iPos]);
-			KvSetColor(hKv, "color", g_iTColors[iColor][0], g_iTColors[iColor][1], g_iTColors[iColor][2], 255);
+			new Handle:hKv = CreateKeyValues("Stuff", "title", sBuffer);
+			KvSetColor(hKv, "color", value[0], value[1], value[2], value[3]);
 			KvSetNum(hKv,   "level", 1);
 			KvSetNum(hKv,   "time",  10);
 			
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
-				if (Client_CanViewAds(client, flagBits))
+				Call_StartForward(g_hForwardPreClientReplace);
+				Call_PushCell(client);
+				Call_PushString(sectionName);
+				Call_PushString(sType);
+				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+				Call_PushCellRef(flagBits);
+				Call_Finish(_:forwardBool);
+				
+				if (forwardBool && Client_CanViewAds(client, flagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					CreateDialog(client, hKv, DialogType_Msg);
 				}
 			}
-			strcopy(sBuffer, sizeof(sBuffer), sText);
 			CloseHandle(hKv);
+		}
+		Call_StartForward(g_hForwardPostAdvert);
+		Call_PushString(sectionName);
+		Call_PushString(sType);
+		Call_PushString(sText);
+		Call_PushCell(flagBits);
+		Call_Finish();
+	}
+	return Plugin_Continue;
+}
+
+public Handler_DoNothing(Handle:menu, MenuAction:action, param1, param2) 
+{
+	if (g_bExitPanel)
+	{
+		switch (action)
+		{
+			case MenuAction_Select:
+			{
+				CloseHandle(menu);
+			}
+			case MenuAction_End:
+			{
+				CloseHandle(menu);
+			}
 		}
 	}
 }
-
-public Handler_DoNothing(Handle:menu, MenuAction:action, param1, param2) {}
 
 public Action:Timer_CenterAd(Handle:timer, Handle:pack) 
 {
@@ -429,13 +579,24 @@ public Action:Timer_CenterAd(Handle:timer, Handle:pack)
 	}
 }
 
+public Action:Command_ShowAd(client, args)
+{
+	AdvertisementTimer(g_hAdvertTimer);
+	return Plugin_Handled;
+}
+
 public Action:Command_ReloadAds(client, args)
 {
-	if (Client_IsValid(client) && g_bPluginEnabled)
+	if (g_bPluginEnabled)
 	{
-		#if defined TF2COLORS
-		parseExtraColors();
+		#if defined ADVERT_TF2COLORS
+		parseExtraChatColors();
 		#endif
+		if (g_hTopColorTrie != INVALID_HANDLE)
+			ClearTrie(g_hTopColorTrie);
+		parseExtraTopColors();
+		if (g_hAdvertisements != INVALID_HANDLE)
+			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
 		Client_PrintToChat(client, true, "%t %t", "Advert_Tag", "Config_Reloaded");
 	}
@@ -446,8 +607,6 @@ stock parseAdvertisements()
 {
 	if (g_bPluginEnabled)
 	{
-		if (g_hAdvertisements != INVALID_HANDLE)
-			CloseHandle(g_hAdvertisements);
 		g_hAdvertisements = CreateKeyValues("Advertisements");
 		
 		if (FileExists(g_strConfigPath)) 
@@ -464,21 +623,21 @@ stock parseAdvertisements()
 
 stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_maxLength)
 {
-	if (g_bPluginEnabled)
+	strcopy(outputText, outputText_maxLength, inputText);
+	new dynamicTagCount = MatchRegex(g_hDynamicTagRegex, outputText);
+	if (dynamicTagCount > 0)
 	{
-		strcopy(outputText, outputText_maxLength, inputText);
-		new dynamicTagCount = MatchRegex(g_hDynamicTagRegex, inputText);
 		decl String:matchedTag[64], String:tempString[64];
+		new Handle:conVarFound;
 		for (new i = 0; i < dynamicTagCount; i++)
 		{
 			GetRegexSubString(g_hDynamicTagRegex, i, matchedTag, sizeof(matchedTag));
 			strcopy(tempString, sizeof(tempString), matchedTag);
-			if (StrContains(tempString, "CONVAR_BOOL"))
+			if (StrContains(tempString, "CONVAR_BOOL", false) != -1)
 			{
-				ReplaceString(tempString, sizeof(tempString), "{CONVAR_BOOL:", "");
-				ReplaceString(tempString, sizeof(tempString), "}", "");
-				String_ToLower(tempString, tempString, sizeof(tempString));
-				new Handle:conVarFound = FindConVar(tempString);
+				ReplaceString(tempString, sizeof(tempString), "{CONVAR_BOOL:", "", false);
+				ReplaceString(tempString, sizeof(tempString), "}", "", false);
+				conVarFound = FindConVar(tempString);
 				if (conVarFound != INVALID_HANDLE)
 				{
 					new conVarValue = GetConVarInt(conVarFound);
@@ -493,10 +652,9 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 			}
 			else
 			{
-				ReplaceString(tempString, sizeof(tempString), "{CONVAR:", "");
-				ReplaceString(tempString, sizeof(tempString), "}", "");
-				String_ToLower(tempString, tempString, sizeof(tempString));
-				new Handle:conVarFound = FindConVar(tempString);
+				ReplaceString(tempString, sizeof(tempString), "{CONVAR:", "", false);
+				ReplaceString(tempString, sizeof(tempString), "}", "", false);
+				conVarFound = FindConVar(tempString);
 				if (conVarFound != INVALID_HANDLE)
 				{
 					decl String:strConVarValue[64];
@@ -508,111 +666,131 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 				ReplaceString(outputText, outputText_maxLength, matchedTag, tempString);
 			}
 		}
-		
-		new i = 1;
-		decl String:strTemp[256];
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			GetServerIP(strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			GetServerIP(strTemp, sizeof(strTemp), true);
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			Format(strTemp, sizeof(strTemp), "%i", Server_GetPort());
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			GetCurrentMap(strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			GetNextMap(strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			IntToString(g_iTickrate, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			FormatTime(strTemp, sizeof(strTemp), "%I:%M:%S%p");
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			FormatTime(strTemp, sizeof(strTemp), "%H:%M:%S");
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			FormatTime(strTemp, sizeof(strTemp), "%x");
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		i++;
-		if (StrContains(outputText, g_tagRawText[i]) != -1)
-		{
-			new iMins, iSecs, iTimeLeft;
-				
-			if (GetMapTimeLeft(iTimeLeft) && iTimeLeft > 0) 
-			{
-				iMins = iTimeLeft / 60;
-				iSecs = iTimeLeft % 60;
-			}
-			
-			Format(strTemp, sizeof(strTemp), "%d:%02d", iMins, iSecs);
-			ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp);
-		}
-		strTemp[0] = '\0';
 	}
+	
+	new i = 1;
+	decl String:strTemp[256];
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		GetServerIP(strTemp, sizeof(strTemp));
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		GetServerIP(strTemp, sizeof(strTemp), true);
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		Format(strTemp, sizeof(strTemp), "%i", Server_GetPort());
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		GetCurrentMap(strTemp, sizeof(strTemp));
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		GetNextMap(strTemp, sizeof(strTemp));
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		IntToString(g_iTickrate, strTemp, sizeof(strTemp));
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		FormatTime(strTemp, sizeof(strTemp), "%I:%M:%S%p");
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		FormatTime(strTemp, sizeof(strTemp), "%H:%M:%S");
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		FormatTime(strTemp, sizeof(strTemp), "%x");
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	i++;
+	if (StrContains(outputText, g_tagRawText[i], false) != -1)
+	{
+		new iMins, iSecs, iTimeLeft;
+			
+		if (GetMapTimeLeft(iTimeLeft) && iTimeLeft > 0) 
+		{
+			iMins = iTimeLeft / 60;
+			iSecs = iTimeLeft % 60;
+		}
+		
+		Format(strTemp, sizeof(strTemp), "%d:%02d", iMins, iSecs);
+		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
+	}
+	strTemp[0] = '\0';
 }
 
 stock ReplaceClientText(client, const String:inputText[], String:outputText[], outputText_maxLength)
 {
-	if (Client_IsValid(client) && g_bPluginEnabled)
+	
+	if (Client_IsValid(client))
 	{
+		strcopy(outputText, outputText_maxLength, inputText);
 		new i = 1;
 		decl String:strTemp[256];
-		strcopy(outputText, outputText_maxLength, inputText);
-		if (StrContains(outputText, g_clientRawText[i]) != -1)
+		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			GetClientName(client, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
-		if (StrContains(outputText, g_clientRawText[i]) != -1)
+		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			GetClientAuthString(client, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
-		if (StrContains(outputText, g_clientRawText[i]) != -1)
+		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			GetClientIP(client, strTemp, sizeof(strTemp));
-			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
+		}
+		i++;
+		if (StrContains(outputText, g_clientRawText[i], false) != -1)
+		{
+			GetClientIP(client, strTemp, sizeof(strTemp), false);
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
+		}
+		i++;
+		if (StrContains(outputText, g_clientRawText[i], false) != -1)
+		{
+			Format(strTemp, sizeof(strTemp), "%d", GetClientTime(client));
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
+		}
+		i++;
+		if (StrContains(outputText, g_clientRawText[i], false) != -1)
+		{
+			Format(strTemp, sizeof(strTemp), "%d", Client_GetMapTime(client));
+			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		strTemp[0] = '\0';
 	}
+	return;
 }
 
 stock GetServerIP(String:ipAddress[], serverIP_maxLength, bool:fullIp = false)
 {
-	Server_GetIPString(ipAddress, serverIP_maxLength, g_bUseSteamTools);
+	Server_GetIPNumString(ipAddress, serverIP_maxLength, g_bUseSteamTools);
 	if (fullIp)
 	{
 		new serverPublicPort = Server_GetPort();
@@ -620,8 +798,10 @@ stock GetServerIP(String:ipAddress[], serverIP_maxLength, bool:fullIp = false)
 	}
 }
 
-stock bool:Client_CanViewAds(client, clientFlagBits)
+public CanViewAdvert(Handle:plugin, numParams)
 {
+	new client = GetNativeCell(1);
+	new clientFlagBits = GetNativeCell(2);
 	if (clientFlagBits == -1)
 		return true;
 	if (CheckCommandAccess(client, "extended_advert", clientFlagBits) || CheckCommandAccess(client, "extended_adverts", ADMFLAG_ROOT))
@@ -629,15 +809,15 @@ stock bool:Client_CanViewAds(client, clientFlagBits)
 	return false;
 }
 
-#if defined TF2COLORS
-stock parseExtraColors()
+#if defined ADVERT_TF2COLORS
+stock parseExtraChatColors()
 {
 	if (g_bPluginEnabled)
 	{
-		if (FileExists(g_strExtraColorsPath)) 
+		if (FileExists(g_strExtraChatColorsPath)) 
 		{
-			new Handle:keyValues = CreateKeyValues("Extra Colors");
-			FileToKeyValues(keyValues, g_strExtraColorsPath);
+			new Handle:keyValues = CreateKeyValues("Extra Chat Colors");
+			FileToKeyValues(keyValues, g_strExtraChatColorsPath);
 			KvGotoFirstSubKey(keyValues);
 			decl String:colorName[128], hex;
 			do
@@ -654,17 +834,153 @@ stock parseExtraColors()
 }
 #endif
 
-stock String_RemoveExtraTags(String:inputString[], inputString_maxLength)
+stock parseExtraTopColors()
 {
-	CRemoveTags(inputString, inputString_maxLength);
-	for (new i = 1; i < sizeof(g_tagRawText); i++)
+	if (g_bPluginEnabled)
 	{
-		if (StrContains(inputString, g_tagRawText[i], false))
-			ReplaceString(inputString, inputString_maxLength, g_tagRawText[i], "", false);
+		if (FileExists(g_strExtraTopColorsPath)) 
+		{
+			new Handle:keyValues = CreateKeyValues("Extra Top Colors");
+			FileToKeyValues(keyValues, g_strExtraTopColorsPath);
+			KvGotoFirstSubKey(keyValues);
+			decl String:colorName[128], red, green, blue, alpha;
+			do
+			{
+				KvGetSectionName(keyValues, colorName, sizeof(colorName));
+				String_ToLower(colorName, colorName, sizeof(colorName));
+				red = KvGetNum(keyValues, "red");
+				green = KvGetNum(keyValues, "green");
+				blue = KvGetNum(keyValues, "blue");
+				alpha = KvGetNum(keyValues, "alpha", 255);
+				new rgba[4];
+				rgba[0] = red;
+				rgba[1] = green;
+				rgba[2] = blue;
+				rgba[3] = alpha;
+				SetTrieArray(g_hTopColorTrie, colorName, rgba, 4);
+			}
+			while (KvGotoNextKey(keyValues));
+			KvRewind(keyValues);
+		}
 	}
-	for (new x = 0; x < sizeof(g_sTColors); x++)
+}
+
+stock initTopColorTrie()
+{
+	g_hTopColorTrie = CreateTrie();
+	SetTrieArray(g_hTopColorTrie, "white", {255, 255, 255, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "red", {255, 0, 0, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "green", {0, 255, 0, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "blue", {0, 0, 255, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "yellow", {255, 255, 0, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "purple", {255, 0, 255, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "cyan", {0, 255, 255, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "orange", {255, 128, 0, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "pink", {255, 0, 128, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "olive", {128, 255, 0, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "lime", {0, 255, 128, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "violet", {128, 0, 255, 255}, 4);
+	SetTrieArray(g_hTopColorTrie, "lightblue", {0, 128, 255, 255}, 4);
+}
+
+stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
+{
+	decl String:part[256], String:find[32];
+	new value[4], first, last;
+	new index = 0;
+	for (new i = 0; i < 100; i++) 
 	{
-		if (StrContains(inputString, g_sTColors[x], false))
-			ReplaceString(inputString, inputString_maxLength, g_sTColors[x], "", false);
+		first = FindCharInString(input[index], '{');
+		last = FindCharInString(input[index], '}');
+		if (first == -1 || last == -1) 
+		{
+			return; // no opening or closing brace
+		}
+		first++;
+		last--;
+		for (new j = 0; j <= last - first + 1; j++) 
+		{
+			if(j == last - first + 1) 
+			{
+				part[j] = 0;
+				break;
+			}
+			part[j] = input[index + first + j];
+		}
+		index += last + 2;
+		String_ToLower(part, part, sizeof(part));
+		#if defined ADVERT_TF2COLORS
+		if (ignoreChat && GetTrieValue(CTrie, part, 0))
+			continue;
+		#else
+		if (ignoreChat)
+		{
+			decl String:colorTag[64];
+			for (new x = 0; x < sizeof(CTag); x++)
+			{
+				strcopy(colorTag, sizeof(colorTag), CTag[x]);
+				ReplaceString(colorTag, sizeof(colorTag), "{", "", false);
+				ReplaceString(colorTag, sizeof(colorTag), "}", "", false);
+				new result = StrEqual(part, colorTag, false);
+				if (result)
+					continue;
+			}
+		}
+		#endif
+		if (GetTrieArray(g_hTopColorTrie, part, value, 4) == true) 
+		{
+			Format(find, sizeof(find), "{%s}", part);
+			ReplaceString(input, maxlength, find, "", false);
+		}
+	}
+}
+
+stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:ignoreChat = false, bool:ignoreTop = false, bool:ignoreRawTag = false)
+{
+	if (!ignoreChat)
+		CRemoveTags(inputString, inputString_maxLength);
+	if (!ignoreTop)
+		removeTopColors(inputString, inputString_maxLength, ignoreChat);
+	if (!ignoreRawTag)
+	{
+		for (new i = 1; i < sizeof(g_tagRawText); i++)
+		{
+			if (StrContains(inputString, g_tagRawText[i], false) != -1)
+				ReplaceString(inputString, inputString_maxLength, g_tagRawText[i], "", false);
+		}
+	}
+}
+
+/** 
+ * 
+ * Modified version of SMLIB's Server_GetIPString
+ * 
+ */
+
+stock Server_GetIPNumString(String:ipBuffer[], ipBuffer_maxLength, bool:useSteamTools)
+{
+	new ip;
+	PrintToChatAll("SteamTools: %d", useSteamTools);
+	switch (useSteamTools)
+	{
+		case true:
+		{
+			new octets[4];
+			Steam_GetPublicIP(octets);
+			ip =
+				octets[0] << 24	|
+				octets[1] << 16	|
+				octets[2] << 8	|
+				octets[3];
+			LongToIP(ip, ipBuffer, ipBuffer_maxLength);
+		}
+		case false:
+		{
+			new Handle:conVarHostIP = INVALID_HANDLE;
+			if (conVarHostIP == INVALID_HANDLE)
+				conVarHostIP = FindConVar("hostip");
+			ip = GetConVarInt(conVarHostIP);
+			LongToIP(ip, ipBuffer, ipBuffer_maxLength);
+		}
 	}
 }
