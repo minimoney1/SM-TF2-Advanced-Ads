@@ -4,7 +4,7 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.0.2"
+			"Latest"	"1.1.0"
 		}
 		
 		"Notes"	"The extra_ad_colors.txt has been renamed to extra_chat_colors.txt, please make sure you port all your extra chat colors from the old file to the new one."

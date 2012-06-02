@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-//#define ADVERT_TF2COLORS
+#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -598,7 +598,7 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		Client_PrintToChat(client, true, "%t %t", "Advert_Tag", "Config_Reloaded");
+		CPrintToChat(client, "%t %t", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
@@ -624,7 +624,7 @@ stock parseAdvertisements()
 stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_maxLength)
 {
 	strcopy(outputText, outputText_maxLength, inputText);
-	decl String:part[256], String:find[128], String:replace[128];
+	decl String:part[256], String:replace[128];
 	new first, last;
 	new index = 0;
 	for (new i = 0; i < 100; i++) 
@@ -638,7 +638,6 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 				if (j == last - first + 1) 
 				{
 					part[j] = 0;
-					PrintToChatAll("Part = %s", part);
 					break;
 				}
 				part[j] = outputText[index + first + j];
@@ -646,8 +645,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 			index += last + 1;
 			if (MatchRegex(g_hDynamicTagRegex, part) > 0)
 			{
-				GetRegexSubString(g_hDynamicTagRegex, 0, find, sizeof(find));
-				strcopy(replace, sizeof(replace), find);
+				strcopy(replace, sizeof(replace), part);
 				new Handle:conVarFound = INVALID_HANDLE;
 				if (StrContains(replace, "CONVAR_BOOL", false) != -1)
 				{
@@ -675,7 +673,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 					else
 						replace = "";
 				}
-				ReplaceString(outputText, outputText_maxLength, find, replace);
+				ReplaceString(outputText, outputText_maxLength, part, replace);
 			}
 		}
 		else
@@ -897,20 +895,20 @@ stock initTopColorTrie()
 	SetTrieArray(g_hTopColorTrie, "lightblue", {0, 128, 255, 255}, 4);
 }
 
-stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
+stock removeTopColors(String:input[], maxlength/*, bool:ignoreChat = true*/)
 {
 	decl String:part[256], String:find[32];
 	new value[4], first, last;
 	new index = 0;
-	new bool:result = false;
+	//new bool:result = false;
 	for (new i = 0; i < 100; i++) 
 	{
-		result = false;
+		//result = false;
 		first = FindCharInString(input[index], '{');
 		last = FindCharInString(input[index], '}');
 		if (first == -1 || last == -1) 
 		{
-			return; // no opening or closing brace
+			return;
 		}
 		first++;
 		last--;
@@ -925,7 +923,7 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 		}
 		index += last + 2;
 		String_ToLower(part, part, sizeof(part));
-		#if defined ADVERT_TF2COLORS
+		/*#if defined ADVERT_TF2COLORS
 		new value_ex;
 		if (ignoreChat && (GetTrieValue(CTrie, part, value_ex) || !strcmp(part, "default", false) || !strcmp(part, "teamcolor", false)))
 			result = true;
@@ -940,8 +938,8 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 					result = true;
 			}
 		}
-		#endif
-		if (GetTrieArray(g_hTopColorTrie, part, value, 4) && !result) 
+		#endif*/
+		if (GetTrieArray(g_hTopColorTrie, part, value, 4)/* && !result*/) 
 		{
 			Format(find, sizeof(find), "{%s}", part);
 			ReplaceString(input, maxlength, find, "", false);
@@ -954,7 +952,7 @@ stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:i
 	if (!ignoreChat)
 		CRemoveTags(inputString, inputString_maxLength);
 	if (!ignoreTop)
-		removeTopColors(inputString, inputString_maxLength, ignoreChat);
+		removeTopColors(inputString, inputString_maxLength/*, ignoreChat*/);
 	if (!ignoreRawTag)
 	{
 		for (new i = 1; i < sizeof(g_tagRawText); i++)
