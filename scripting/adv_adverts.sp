@@ -31,7 +31,7 @@ new Handle:g_hAdvertDelay = INVALID_HANDLE;
 new Handle:g_hAdvertFile = INVALID_HANDLE;
 new Handle:g_hAdvertisements = INVALID_HANDLE;
 new Handle:g_hAdvertTimer = INVALID_HANDLE;
-new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
+//new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
 new Handle:g_hExitPanel = INVALID_HANDLE;
 new Handle:g_hExtraTopColorsPath = INVALID_HANDLE;
 #if defined ADVERT_TF2COLORS
@@ -187,7 +187,7 @@ public OnPluginStart()
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
 	
-	g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
+	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
@@ -251,12 +251,8 @@ public OnConfigsExecuted()
 	if (g_bPluginEnabled)
 	{
 		if (g_hAdvertTimer != INVALID_HANDLE)
-		{
 			KillTimer(g_hAdvertTimer);
-			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer);
-		}
-		else
-			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer);
+		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -311,7 +307,7 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 	g_fAdvertDelay = StringToFloat(newValue);
 	if (g_hAdvertTimer != INVALID_HANDLE)
 		KillTimer(g_hAdvertTimer);
-	g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
+	g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public OnAdvertFileChange(Handle:conVar, const String:oldValue[], const String:newValue[])
@@ -626,7 +622,8 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 	strcopy(outputText, outputText_maxLength, inputText);
 	decl String:part[256], String:replace[128];
 	new first, last;
-	new index = 0;
+	new index = 0, charIndex;
+	new Handle:conVarFound;
 	for (new i = 0; i < 100; i++) 
 	{
 		first = FindCharInString(outputText[index], '{');
@@ -643,7 +640,45 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 				part[j] = outputText[index + first + j];
 			}
 			index += last + 1;
-			if (MatchRegex(g_hDynamicTagRegex, part) > 0)
+			
+			charIndex = StrContains(part, "{CONVAR:", false);
+			if (charIndex == 0)
+			{
+				strcopy(replace, sizeof(replace), part);
+				ReplaceString(replace, sizeof(replace), "{CONVAR:", "", false);
+				ReplaceString(replace, sizeof(replace), "}", "", false);
+				conVarFound = FindConVar(replace);
+				if (conVarFound != INVALID_HANDLE)
+				{
+					GetConVarString(conVarFound, replace, sizeof(replace));
+					ReplaceString(outputText, outputText_maxLength, part, replace, false);
+				}
+				else
+					ReplaceString(outputText, outputText_maxLength, part, "", false);
+			}
+			else
+			{
+				charIndex = StrContains(part, "{CONVAR_BOOL:", false);
+				if (charIndex == 0)
+				{
+					strcopy(replace, sizeof(replace), part);
+					ReplaceString(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
+					ReplaceString(replace, sizeof(replace), "}", "", false);
+					conVarFound = FindConVar(replace);
+					if (conVarFound != INVALID_HANDLE)
+					{
+						new int = GetConVarInt(conVarFound);
+						if (int == 1 || int == 0)
+							ReplaceString(outputText, outputText_maxLength, part, g_strConVarBoolText[int], false);
+						else
+							ReplaceString(outputText, outputText_maxLength, part, "", false);
+					}
+					else
+						ReplaceString(outputText, outputText_maxLength, part, "", false);
+				}
+			}
+			
+			/*if (MatchRegex(g_hDynamicTagRegex, part) > 0)
 			{
 				strcopy(replace, sizeof(replace), part);
 				new Handle:conVarFound = INVALID_HANDLE;
@@ -674,7 +709,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 						replace = "";
 				}
 				ReplaceString(outputText, outputText_maxLength, part, replace);
-			}
+			}*/
 		}
 		else
 			break;
