@@ -1,3 +1,13 @@
+#if defined ADVERT_TF2COLORS
+
+#define EXT_ADVERT_VERSION "1.1.1-tf2"
+
+#else
+
+#define EXT_ADVERT_VERSION "1.1.1-nontf2"
+
+#endif
+
 public SharedPlugin:__pl_adv_adverts = 
 {
 	name = "adv_adverts",
@@ -41,7 +51,7 @@ native AddExtraTopColor(String:colorName[], red, green, blue, alpha, bool:replac
  * @return				True if client can view the advertisement, false otherwise.
  * 
  */
-native bool:Client_CanViewAds(client, flagBits = -1);
+native bool:Client_CanViewAds(client, flagBits = -1, noFlagBits = -1);
 
 #if defined ADVERT_TF2COLORS
 /**
@@ -74,7 +84,7 @@ native AddExtraChatColor(String:colorName[], hex);
  * @return				Plugin_Continue to allow the advert go through. Anything else would stop the advert from showing.
  * 
  */
-forward Action:OnAdvertPreReplace(String:advertId[], String:advertType[], String:advertText[], &advertFlags);
+forward Action:OnAdvertPreReplace(advertId, String:advertType[], String:advertText[], &advertFlags);
 
 /**
  * 
@@ -92,7 +102,7 @@ forward Action:OnAdvertPreReplace(String:advertId[], String:advertType[], String
  * 
  */
 
-forward bool:OnAdvertPreClientReplace(const String:advertId[], const String:advertType, String:advertText, &advertFlags);
+forward bool:OnAdvertPreClientReplace(client, advertId, const String:advertType, String:advertText, &advertFlags);
 
 /**
  * 
@@ -108,7 +118,7 @@ forward bool:OnAdvertPreClientReplace(const String:advertId[], const String:adve
  * @noreturn
  * 
  */
-forward OnPostAdvertisementShown(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags);
+forward OnPostAdvertisementShown(advertId, const String:advertType[], const String:advertText[], advertFlags);
 
 
 public __pl_myfile_SetNTVOptional()

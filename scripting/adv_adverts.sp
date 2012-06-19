@@ -98,7 +98,7 @@ public Plugin:myinfo =
 	name        = "Extended Advertisements",
 	author      = "Mini",
 	description = "Extended advertisement system for TF2's new color abilities for developers",
-	version     = PLUGIN_VERSION,
+	version     = EXT_ADVERT_VERSION,
 	url         = "http://forums.alliedmods.net/"
 };
 
@@ -106,6 +106,8 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
 	RegPluginLibrary("adv_adverts");
 	MarkNativeAsOptional("Steam_GetPublicIP");
+	MarkNativeAsOptional("Updater_AddPlugin");
+	MarkNativeAsOptional("Updater_RemovePlugin");
 	CreateNative("AddExtraTopColor", AddTopColorToTrie);
 	CreateNative("Client_CanViewAds", CanViewAdvert);
 	#if defined ADVERT_TF2COLORS
@@ -146,7 +148,7 @@ public AddChatColorToTrie(Handle:plugin, numParams)
 
 public OnPluginStart()
 {
-	CreateConVar("extended_advertisements_version", PLUGIN_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("extended_advertisements_version", EXT_ADVERT_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
 	#if defined ADVERT_TF2COLORS
 	decl String:gameFolderName[12];
@@ -183,9 +185,9 @@ public OnPluginStart()
 	
 	AutoExecConfig();
 	
-	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
-	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
-	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_CellByRef, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_Cell, Param_String, Param_String, Param_Cell);
+	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_Cell, Param_String, Param_String, Param_CellByRef);
 	
 	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
 	
@@ -250,8 +252,6 @@ public OnConfigsExecuted()
 	parseAdvertisements();
 	if (g_bPluginEnabled)
 	{
-		if (g_hAdvertTimer != INVALID_HANDLE)
-			KillTimer(g_hAdvertTimer);
 		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
@@ -305,8 +305,6 @@ public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newVa
 public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	g_fAdvertDelay = StringToFloat(newValue);
-	if (g_hAdvertTimer != INVALID_HANDLE)
-		KillTimer(g_hAdvertTimer);
 	g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -322,12 +320,16 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
-		decl String:sFlags[16], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128];
-		new flagBits = -1;
+		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:strSectionName[128], String:noFlags[32];
+		new flagBits = -1,
+			noFlagBits = -1,
+			sectionName;
 		
-		KvGetSectionName(g_hAdvertisements, sectionName, sizeof(sectionName));
+		KvGetSectionName(g_hAdvertisements, strSectionName, sizeof(strSectionName));
+		sectionName = StringToInt(strSectionName);
 		KvGetString(g_hAdvertisements, "type",  sType,  sizeof(sType));
 		KvGetString(g_hAdvertisements, "text",  sText,  sizeof(sText));
+		KvGetString(g_hAdvertisements, "noflags", noFlags, sizeof(noFlags), "none");
 		KvGetString(g_hAdvertisements, "flags", sFlags, sizeof(sFlags), "none");
 		
 		if (!KvGotoNextKey(g_hAdvertisements)) 
@@ -337,17 +339,16 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		}
 		
 		if (!StrEqual(sFlags, "none"))
-		{
 			flagBits = ReadFlagString(sFlags);
-		}
-		else
-			flagBits = -1;
+		
+		if (!StrEqual(noFlags, "none"))
+			noFlagBits = ReadFlagString(noFlags);
 		
 		
 		new Action:forwardReturn = Plugin_Continue,
 			bool:forwardBool = true;
 		Call_StartForward(g_hForwardPreReplace);
-		Call_PushStringEx(sectionName, sizeof(sectionName), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+		Call_PushCellRef(sectionName);
 		Call_PushStringEx(sType, sizeof(sType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 		Call_PushStringEx(sText, sizeof(sText), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 		Call_PushCellRef(flagBits);
@@ -366,13 +367,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushString(sectionName);
+				Call_PushCell(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits))
+				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					PrintCenterText(client, sBuffer);	
@@ -394,13 +395,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushString(sectionName);
+				Call_PushCell(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits))
+				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					PrintHintText(client, sBuffer);
@@ -421,13 +422,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushString(sectionName);
+				Call_PushCell(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits))
+				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					SendPanelToClient(hPl, client, Handler_DoNothing, 10);
@@ -446,13 +447,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushString(sectionName);
+				Call_PushCell(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 
-				if (forwardBool && Client_CanViewAds(client, flagBits))
+				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					CPrintToChat(client, sBuffer);
@@ -507,13 +508,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushString(sectionName);
+				Call_PushCell(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits))
+				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
 					CreateDialog(client, hKv, DialogType_Msg);
@@ -522,7 +523,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			CloseHandle(hKv);
 		}
 		Call_StartForward(g_hForwardPostAdvert);
-		Call_PushString(sectionName);
+		Call_PushCell(sectionName);
 		Call_PushString(sType);
 		Call_PushString(sText);
 		Call_PushCell(flagBits);
@@ -849,9 +850,12 @@ public CanViewAdvert(Handle:plugin, numParams)
 {
 	new client = GetNativeCell(1);
 	new clientFlagBits = GetNativeCell(2);
-	if (clientFlagBits == -1)
+	new noFlagBits = GetNativeCell(3);
+	if (clientFlagBits == -1 && noFlagBits == -1)
 		return true;
-	if (CheckCommandAccess(client, "extended_advert", clientFlagBits) || CheckCommandAccess(client, "extended_adverts", ADMFLAG_ROOT))
+	if (CheckCommandAccess(client, "extended_adverts", ADMFLAG_ROOT))
+		return true;
+	if ((clientFlagBits == -1 || CheckCommandAccess(client, "extended_advert", clientFlagBits)) && (noFlagBits == -1 || !CheckCommandAccess(client, "extended_notview", noFlagBits)))
 		return true;
 	return false;
 }
@@ -930,15 +934,15 @@ stock initTopColorTrie()
 	SetTrieArray(g_hTopColorTrie, "lightblue", {0, 128, 255, 255}, 4);
 }
 
-stock removeTopColors(String:input[], maxlength/*, bool:ignoreChat = true*/)
+stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 {
 	decl String:part[256], String:find[32];
 	new value[4], first, last;
 	new index = 0;
-	//new bool:result = false;
+	new bool:result = false;
 	for (new i = 0; i < 100; i++) 
 	{
-		//result = false;
+		result = false;
 		first = FindCharInString(input[index], '{');
 		last = FindCharInString(input[index], '}');
 		if (first == -1 || last == -1) 
@@ -958,7 +962,7 @@ stock removeTopColors(String:input[], maxlength/*, bool:ignoreChat = true*/)
 		}
 		index += last + 2;
 		String_ToLower(part, part, sizeof(part));
-		/*#if defined ADVERT_TF2COLORS
+		#if defined ADVERT_TF2COLORS
 		new value_ex;
 		if (ignoreChat && (GetTrieValue(CTrie, part, value_ex) || !strcmp(part, "default", false) || !strcmp(part, "teamcolor", false)))
 			result = true;
@@ -973,8 +977,8 @@ stock removeTopColors(String:input[], maxlength/*, bool:ignoreChat = true*/)
 					result = true;
 			}
 		}
-		#endif*/
-		if (GetTrieArray(g_hTopColorTrie, part, value, 4)/* && !result*/) 
+		#endif
+		if (GetTrieArray(g_hTopColorTrie, part, value, 4) && !result) 
 		{
 			Format(find, sizeof(find), "{%s}", part);
 			ReplaceString(input, maxlength, find, "", false);
@@ -987,7 +991,7 @@ stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:i
 	if (!ignoreChat)
 		CRemoveTags(inputString, inputString_maxLength);
 	if (!ignoreTop)
-		removeTopColors(inputString, inputString_maxLength/*, ignoreChat*/);
+		removeTopColors(inputString, inputString_maxLength, ignoreChat);
 	if (!ignoreRawTag)
 	{
 		for (new i = 1; i < sizeof(g_tagRawText); i++)
