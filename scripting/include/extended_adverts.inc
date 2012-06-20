@@ -121,9 +121,11 @@ forward bool:OnAdvertPreClientReplace(client, advertId, const String:advertType,
 forward OnPostAdvertisementShown(advertId, const String:advertType[], const String:advertText[], advertFlags);
 
 
-public __pl_myfile_SetNTVOptional()
+public __pl_adv_adverts_SetNTVOptional()
 {
 	MarkNativeAsOptional("AddExtraTopColor");
+#if defined ADVERT_TF2COLORS
 	MarkNativeAsOptional("AddExtraChatColor");
+#endif
 	MarkNativeAsOptional("Client_CanViewAds");
 }

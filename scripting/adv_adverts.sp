@@ -199,6 +199,15 @@ public OnPluginStart()
 	}
 }
 
+/**
+ * 
+ * Format Time
+ * Note: Credit goes to GameME, this was a mere copy and paste
+ * 
+ */
+
+ 
+ 
 public OnLibraryAdded(const String:name[])
 {
 	if (StrEqual(name, "updater"))
@@ -486,6 +495,11 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				}
 				index += last + 2;
 				String_ToLower(part, part, sizeof(part));
+				if (g_hTopColorTrie == INVALID_HANDLE)
+				{
+					initTopColorTrie();
+					parseExtraTopColors();
+				}
 				if (GetTrieArray(g_hTopColorTrie, part, value, 4)) 
 				{
 					Format(find, sizeof(find), "{%s}", part);
@@ -978,6 +992,11 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 			}
 		}
 		#endif
+		if (g_hTopColorTrie == INVALID_HANDLE)
+		{
+			initTopColorTrie();
+			parseExtraTopColors();
+		}
 		if (GetTrieArray(g_hTopColorTrie, part, value, 4) && !result) 
 		{
 			Format(find, sizeof(find), "{%s}", part);
