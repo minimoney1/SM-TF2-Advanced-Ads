@@ -473,7 +473,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
-					CPrintToChat(client, sBuffer);
+					CPrintToChatEx(client, client, sBuffer);
 				}
 			}
 		}
