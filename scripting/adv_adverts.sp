@@ -206,7 +206,15 @@ public OnPluginStart()
  * 
  */
 
- 
+stock format_time(timestamp, String: formatted_time[192]) 
+{ 
+	Format(formatted_time, 192, "%dd %02d:%02d:%02dh", 
+			timestamp / 86400, 
+			timestamp / 3600 % 24, 
+			timestamp / 60 % 60, 
+			timestamp % 60 
+		); 
+}
  
 public OnLibraryAdded(const String:name[])
 {
