@@ -176,6 +176,11 @@ public OnPluginStart()
 	
 	InitiConfiguration();
 	
+	if (g_hPluginEnabled)
+	{
+		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+	}
+	
 	LoadTranslations("extended_advertisements.phrases");
 	
 	
@@ -267,12 +272,50 @@ public OnConfigsExecuted()
 	#endif
 	parseExtraTopColors();
 	parseAdvertisements();
-	if (g_bPluginEnabled)
+	if (!g_bPluginEnabled)
 	{
-		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
+	}
+	else
+	{
+		if (g_hAdvertTimer == INVALID_HANDLE)
+		{
+			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		}
 	}
 }
 
+public OnMapStart()
+{
+	if (!g_bPluginEnabled)
+	{
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
+	}
+	else
+	{
+		if (g_hAdvertTimer == INVALID_HANDLE)
+		{
+			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		}
+	}
+}
+
+public OnMapEnd()
+{
+	if (g_hAdvertTimer != INVALID_HANDLE)
+	{
+		KillTimer(g_hAdvertTimer);
+		g_hAdvertTimer = INVALID_HANDLE;
+	}
+}
 
 stock InitiConfiguration()
 {
@@ -317,12 +360,43 @@ public OnExtraChatColorsPathChange(Handle:conVar, const String:oldValue[], const
 public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	g_bPluginEnabled = StringToInt(newValue) ? true : false;
+	
+	if (!g_bPluginEnabled)
+	{
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
+	}
+	else
+	{
+		if (g_hAdvertTimer == INVALID_HANDLE)
+		{
+			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		}
+	}
 }
 
 public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	g_fAdvertDelay = StringToFloat(newValue);
-	g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+	
+	if (!g_bPluginEnabled)
+	{
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
+	}
+	else
+	{
+		if (g_hAdvertTimer == INVALID_HANDLE)
+		{
+			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		}
+	}
 }
 
 public OnAdvertFileChange(Handle:conVar, const String:oldValue[], const String:newValue[])
