@@ -23,6 +23,19 @@ public SharedPlugin:__pl_adv_adverts =
 #endif
 };
 
+/**
+ * 
+ * Adds an advertisement to the advertisements list
+ * 
+ * @param advertId		The ID of the advertisement
+ * @param advertType	The string that contains the letters for the type of the advertisement
+ * @param advertText	The unedited string (with tags) of the advertisement
+ * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
+ * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
+ * 
+ */
+
+native AddAdvert(advertId, const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1);
 
 /**
  * 

@@ -108,15 +108,32 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	MarkNativeAsOptional("Steam_GetPublicIP");
 	MarkNativeAsOptional("Updater_AddPlugin");
 	MarkNativeAsOptional("Updater_RemovePlugin");
-	CreateNative("AddExtraTopColor", AddTopColorToTrie);
-	CreateNative("Client_CanViewAds", CanViewAdvert);
+	CreateNative("AddExtraTopColor", Native_AddTopColorToTrie);
+	CreateNative("Client_CanViewAds", Native_CanViewAdvert);
+	CreateNative("AddAdvert", Native_AddAdvert);
 	#if defined ADVERT_TF2COLORS
-	CreateNative("AddExtraChatColor", AddChatColorToTrie);
+	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
 }
 
-public AddTopColorToTrie(Handle:plugin, numParams)
+public Native_AddAdvert(Handle:plugin, numParams)
+{
+	new advertId = GetNativeCell(1);
+	new advertText_ml, advertType_ml;
+	GetNativeStringLength(2, advertText_ml);
+	GetNativeStringLength(3, advertType_ml);
+	decl String:advertText[advertText_ml], String:advertType[advertType_ml];
+	GetNativeString(2, advertText, advertText_ml);
+	GetNativeString(3, advertType, advertType_ml);
+	new flagBits = GetNativeCell(4);
+	new noFlagBits = GetNativeCell(5);
+	
+	decl String:sectionName[32];
+	IntToString(advertId, sectionName, sizeof(sectionName));
+}
+
+public Native_AddTopColorToTrie(Handle:plugin, numParams)
 {
 	decl String:colorName[128], colorName_maxLength;
 	GetNativeStringLength(1, colorName_maxLength);
@@ -135,7 +152,7 @@ public AddTopColorToTrie(Handle:plugin, numParams)
 }
 
 #if defined ADVERT_TF2COLORS
-public AddChatColorToTrie(Handle:plugin, numParams)
+public Native_AddChatColorToTrie(Handle:plugin, numParams)
 {
 	decl String:colorName[128], colorName_maxLength;
 	GetNativeStringLength(1, colorName_maxLength);
@@ -942,7 +959,7 @@ stock GetServerIP(String:ipAddress[], serverIP_maxLength, bool:fullIp = false)
 	}
 }
 
-public CanViewAdvert(Handle:plugin, numParams)
+public Native_CanViewAdvert(Handle:plugin, numParams)
 {
 	new client = GetNativeCell(1);
 	new clientFlagBits = GetNativeCell(2);
@@ -1134,4 +1151,9 @@ stock Server_GetIPNumString(String:ipBuffer[], ipBuffer_maxLength, bool:useSteam
 			LongToIP(ip, ipBuffer, ipBuffer_maxLength);
 		}
 	}
+}
+
+public OnPluginEnd()
+{
+	CloseHandle(g_hAdvertisements);
 }
