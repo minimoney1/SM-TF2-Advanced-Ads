@@ -25,6 +25,18 @@ public SharedPlugin:__pl_adv_adverts =
 
 /**
  * 
+ * Shows an advertisement
+ * 
+ * @param advertId		The ID of the advertisement that needs to be shown. NULL_STRING if you want to show the next advertisement.
+ * 
+ * @return				True if the advert was shown, false otherwise.
+ * 
+ */
+
+native ShowAdvert(const String:advertId[] = NULL_STRING);
+
+/**
+ * 
  * Adds an advertisement to the advertisements list
  * 
  * @param advertId		The ID of the advertisement (As a string, does not need to be numerical)

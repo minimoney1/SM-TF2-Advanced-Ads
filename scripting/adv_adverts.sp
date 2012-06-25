@@ -111,10 +111,26 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("AddExtraTopColor", Native_AddTopColorToTrie);
 	CreateNative("Client_CanViewAds", Native_CanViewAdvert);
 	CreateNative("AddAdvert", Native_AddAdvert);
+	CreateNative("ShowAdvert", Native_ShowAdvert);
 	#if defined ADVERT_TF2COLORS
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
+}
+
+public Native_ShowAdvert(Handle:plugin, numParams)
+{
+	new maxlength;
+	GetNativeStringLength(1, maxlength);
+	decl String:advertId[maxlength];
+	GetNativeString(1, advertId, maxlength);
+	if (advertId != NULL_STRING)
+	{
+		if (!KvJumpToKey(g_hAdvertisements, advertId))
+			return false;
+	}
+	AdvertisementTimer(g_hAdvertTimer);
+	return true;
 }
 
 public Native_AddAdvert(Handle:plugin, numParams)
@@ -706,7 +722,19 @@ public Action:Timer_CenterAd(Handle:timer, Handle:pack)
 
 public Action:Command_ShowAd(client, args)
 {
-	AdvertisementTimer(g_hAdvertTimer);
+	if (args > 0)
+	{
+		decl String:arg[256];
+		GetCmdArgString(arg, sizeof(arg));
+		StripQuotes(arg);
+		if (!ShowAdvert(arg))
+		{
+			ReplyToCommand(client, "[SM] The given advertisement was not found.");
+			return Plugin_Handled;
+		}
+	}
+	else
+		ShowAdvert();
 	return Plugin_Handled;
 }
 
