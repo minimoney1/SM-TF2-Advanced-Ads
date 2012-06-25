@@ -27,15 +27,17 @@ public SharedPlugin:__pl_adv_adverts =
  * 
  * Adds an advertisement to the advertisements list
  * 
- * @param advertId		The ID of the advertisement
+ * @param advertId		The ID of the advertisement (As a string, does not need to be numerical)
  * @param advertType	The string that contains the letters for the type of the advertisement
  * @param advertText	The unedited string (with tags) of the advertisement
  * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
  * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
  * 
+ * @return				True if the advert was successfully created, false if there is already an advert with the same name.
+ * 
  */
 
-native AddAdvert(advertId, const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1);
+native AddAdvert(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1);
 
 /**
  * 
@@ -47,6 +49,8 @@ native AddAdvert(advertId, const String:advertType[], const String:advertText[],
  * @param blue			The blue value
  * @param alpha			The alpha value
  * @param replace		If a color with an equal name was found, should we replace it?
+ * 
+ * @return				True on success, false on failure
  * 
  */
 
@@ -86,7 +90,7 @@ native AddExtraChatColor(String:colorName[], hex);
  * 
  * Called before replacing the advert tags (The tags inside of '{' and '}' braces.
  * 
- * @param advertId		The id of the advertisement as specified in the config. (By-Ref)
+ * @param advertId		The id of the advertisement as specified in the config
  * @param advertType	The string containing the advertisement type(s) as specified in the config. (By-Ref)
  * @param advertText	The text string of the advertisement including all the tags inside of '{' and '}' braces. (By-Ref)
  * @param advertFlags	The flag bits that a client needs to have to view this advertisement. (By-Ref)
@@ -97,7 +101,7 @@ native AddExtraChatColor(String:colorName[], hex);
  * @return				Plugin_Continue to allow the advert go through. Anything else would stop the advert from showing.
  * 
  */
-forward Action:OnAdvertPreReplace(advertId, String:advertType[], String:advertText[], &advertFlags);
+forward Action:OnAdvertPreReplace(const String:advertId[], String:advertType[], String:advertText[], &advertFlags);
 
 /**
  * 
@@ -115,7 +119,7 @@ forward Action:OnAdvertPreReplace(advertId, String:advertType[], String:advertTe
  * 
  */
 
-forward bool:OnAdvertPreClientReplace(client, advertId, const String:advertType, String:advertText, &advertFlags);
+forward bool:OnAdvertPreClientReplace(client, const String:advertId[], const String:advertType, String:advertText, &advertFlags);
 
 /**
  * 
@@ -131,7 +135,7 @@ forward bool:OnAdvertPreClientReplace(client, advertId, const String:advertType,
  * @noreturn
  * 
  */
-forward OnPostAdvertisementShown(advertId, const String:advertType[], const String:advertText[], advertFlags);
+forward OnPostAdvertisementShown(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags);
 
 
 public __pl_adv_adverts_SetNTVOptional()

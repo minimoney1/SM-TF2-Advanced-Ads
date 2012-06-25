@@ -83,7 +83,7 @@ static String:g_clientRawText[7][32] =
 	"{CLIENT_STEAMID}",
 	"{CLIENT_IP}",
 	"{CLIENT_FULLIP}",
-	"{CLIENT_CONNECTION_SECONDS}",
+	"{CLIENT_CONNECTION_TIME}",
 	"{CLIENT_MAPTIME}"
 };
 
@@ -119,18 +119,36 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 
 public Native_AddAdvert(Handle:plugin, numParams)
 {
-	new advertId = GetNativeCell(1);
+	new advertId_ml;
+	GetNativeStringLength(1, advertId_ml);
+	decl String:advertId[advertId_ml];
+	GetNativeString(1, advertId, advertId_ml);
+	
+	KvSavePosition(g_hAdvertisements);
+	
+	if (KvJumpToKey(g_hAdvertisements, sectionName, true))
+	{
+		KvRewind(g_hAdvertisements);
+		return false;
+	}
+	
 	new advertText_ml, advertType_ml;
-	GetNativeStringLength(2, advertText_ml);
-	GetNativeStringLength(3, advertType_ml);
+	GetNativeStringLength(3, advertText_ml);
+	GetNativeStringLength(2, advertType_ml);
 	decl String:advertText[advertText_ml], String:advertType[advertType_ml];
-	GetNativeString(2, advertText, advertText_ml);
-	GetNativeString(3, advertType, advertType_ml);
+	GetNativeString(3, advertText, advertText_ml);
+	GetNativeString(2, advertType, advertType_ml);
 	new flagBits = GetNativeCell(4);
 	new noFlagBits = GetNativeCell(5);
 	
-	decl String:sectionName[32];
-	IntToString(advertId, sectionName, sizeof(sectionName));
+	KvSetString(g_hAdvertisements, "type", advertType);
+	KvSetString(g_hAdvertisements, "text", advertText);
+	KvSetNum(g_hAdvertisements, "flags", flagBits);
+	KvSetNum(g_hAdvertisements, "noflags", noFlagBits);
+	
+	KvRewind(g_hAdvertisements);
+	
+	return true;
 }
 
 public Native_AddTopColorToTrie(Handle:plugin, numParams)
@@ -207,9 +225,9 @@ public OnPluginStart()
 	
 	AutoExecConfig();
 	
-	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_CellByRef, Param_String, Param_String, Param_CellByRef);
-	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_Cell, Param_String, Param_String, Param_Cell);
-	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_Cell, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
+	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
 	
 	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
 	
@@ -428,13 +446,11 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
-		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:strSectionName[128], String:noFlags[32];
+		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128], String:noFlags[32];
 		new flagBits = -1,
-			noFlagBits = -1,
-			sectionName;
+			noFlagBits = -1;
 		
-		KvGetSectionName(g_hAdvertisements, strSectionName, sizeof(strSectionName));
-		sectionName = StringToInt(strSectionName);
+		KvGetSectionName(g_hAdvertisements, sectionName, sizeof(sectionName));
 		KvGetString(g_hAdvertisements, "type",  sType,  sizeof(sType));
 		KvGetString(g_hAdvertisements, "text",  sText,  sizeof(sText));
 		KvGetString(g_hAdvertisements, "noflags", noFlags, sizeof(noFlags), "none");
@@ -456,7 +472,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		new Action:forwardReturn = Plugin_Continue,
 			bool:forwardBool = true;
 		Call_StartForward(g_hForwardPreReplace);
-		Call_PushCellRef(sectionName);
+		Call_PushString(sectionName);
 		Call_PushStringEx(sType, sizeof(sType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 		Call_PushStringEx(sText, sizeof(sText), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 		Call_PushCellRef(flagBits);
@@ -475,7 +491,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushCell(sectionName);
+				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
@@ -503,7 +519,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushCell(sectionName);
+				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
@@ -530,7 +546,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushCell(sectionName);
+				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
@@ -555,7 +571,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushCell(sectionName);
+				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
@@ -621,7 +637,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
-				Call_PushCell(sectionName);
+				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
@@ -636,7 +652,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			CloseHandle(hKv);
 		}
 		Call_StartForward(g_hForwardPostAdvert);
-		Call_PushCell(sectionName);
+		Call_PushString(sectionName);
 		Call_PushString(sType);
 		Call_PushString(sText);
 		Call_PushCell(flagBits);
