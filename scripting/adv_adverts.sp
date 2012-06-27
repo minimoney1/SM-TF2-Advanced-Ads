@@ -45,7 +45,13 @@ new Handle:g_hTopColorTrie = INVALID_HANDLE;
 
 new Handle:g_hForwardPreReplace,
 	Handle:g_hForwardPreClientReplace,
-	Handle:g_hForwardPostAdvert;
+	Handle:g_hForwardPostAdvert,
+	Handle:g_hForwardPreAddChatColor,
+	Handle:g_hForwardPostAddChatColor,
+	Handle:g_hForwardPreAddTopColor,
+	Handle:g_hForwardPostAddTopColor,
+	Handle:g_hForwardPreAddAdvert,
+	Handle:g_hForwardPostAddAdvert;
 
 new bool:g_bPluginEnabled,
 	bool:g_bExitPanel,
@@ -112,10 +118,55 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("Client_CanViewAds", Native_CanViewAdvert);
 	CreateNative("AddAdvert", Native_AddAdvert);
 	CreateNative("ShowAdvert", Native_ShowAdvert);
+	CreateNative("ReloadAdverts", Native_ReloadAds);
+	CreateNative("DeleteAdvert", Native_DeleteAdvert);
 	#if defined ADVERT_TF2COLORS
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
+}
+
+public Native_DeleteAdvert(Handle:plugin, numParams)
+{
+	new ml;
+	GetNativeStringLength(1, ml);
+	decl String:id[ml];
+	GetNativeString(1, id, ml);
+	KvSavePosition(kv);
+	if (KvJumpToKey(g_hAdvertisements, id))
+	{
+		KvDeleteThis(g_hAdvertisements);
+		KvRewind(g_hAdvertisements);
+		return true;
+	}
+	return false;
+}
+public Native_ReloadAds(Handle:plugin, numParams)
+{
+	new bool:ads = GetNativeCell(1),
+		bool:tsay = GetNativeCell(2);
+#if defined ADVERT_TF2COLORS	
+	new bool:chat = GetNativeCell(3);
+#endif
+	if (ads)
+	{
+		if (g_hAdvertisements != INVALID_HANDLE)
+			CloseHandle(g_hAdvertisements);
+		parseAdvertisements();
+	}
+	if (tsay)
+	{
+		if (g_hTopColorTrie != INVALID_HANDLE)
+			ClearTrie(g_hTopColorTrie);
+		initTopColorTrie();
+		parseExtraTopColors();
+	}
+#if defined ADVERT_TF2COLORS
+	if (chat)
+	{
+		parseExtraChatColors();
+	}
+#endif
 }
 
 public Native_ShowAdvert(Handle:plugin, numParams)
@@ -124,12 +175,17 @@ public Native_ShowAdvert(Handle:plugin, numParams)
 	GetNativeStringLength(1, maxlength);
 	decl String:advertId[maxlength];
 	GetNativeString(1, advertId, maxlength);
+	new bool:order = GetNativeCell(2);
+	if (order)
+		KvSavePosition(g_hAdvertisements);
 	if (advertId != NULL_STRING)
 	{
 		if (!KvJumpToKey(g_hAdvertisements, advertId))
 			return false;
 	}
 	AdvertisementTimer(g_hAdvertTimer);
+	if (order)
+		KvRewind(g_hAdvertisements);
 	return true;
 }
 
@@ -142,11 +198,13 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	
 	KvSavePosition(g_hAdvertisements);
 	
-	if (KvJumpToKey(g_hAdvertisements, sectionName, true))
+	if (KvJumpToKey(g_hAdvertisements, sectionName))
 	{
 		KvRewind(g_hAdvertisements);
 		return false;
 	}
+	
+	KvJumpToKey(g_hAdvertisements, sectionName, true);
 	
 	new advertText_ml, advertType_ml;
 	GetNativeStringLength(3, advertText_ml);
@@ -202,9 +260,7 @@ public OnPluginStart()
 	CreateConVar("extended_advertisements_version", EXT_ADVERT_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
 	#if defined ADVERT_TF2COLORS
-	decl String:gameFolderName[12];
-	GetGameFolderName(gameFolderName, sizeof(gameFolderName));
-	if ((!StrEqual(gameFolderName, "tf", false)) && (!StrEqual(gameFolderName, "tf_beta", false)))
+	if (!IsGameCompatible())
 		SetFailState("[Extended Advertisements] You are running a version of this plugin that is incompatible with your game.");
 	#endif
 	g_hPluginEnabled = CreateConVar("sm_extended_advertisements_enabled", "1", "Is plugin enabled?", 0, true, 0.0, true, 1.0);
@@ -237,6 +293,7 @@ public OnPluginStart()
 	
 	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_ROOT);
 	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_ROOT);
+	RegAdminCmd("sm_addadvert", Command_AddAdvert, ADMFLAG_ROOT);
 	
 	
 	AutoExecConfig();
@@ -244,6 +301,12 @@ public OnPluginStart()
 	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook);
+	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore);
+	g_hForwardPreAddTopColor = CreateGlobalForward("OnAddTopColorPre", ET_Hook);
+	g_hForwardPostAddTopColor = CreateGlobalForward("OnAddTopColorPost", ET_Ignore);
+	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook);
+	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore);
 	
 	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
 	
@@ -253,6 +316,40 @@ public OnPluginStart()
 	{
 		Updater_AddPlugin(UPDATE_URL);
 	}
+}
+
+stock bool:IsGameCompatible()
+{
+	new sdkversion = GuessSDKVersion();
+	if (SOURCE_SDK_EPISODE2VALVE <= sdkversion < SOURCE_SDK_LEFT4DEAD || sdkversion >= SOURCE_SDK_CSGO)
+		return true;
+	return false;
+}
+
+// [SM] Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]
+public Command_AddAdvert(client, args)
+{
+	switch (args)
+	{
+		case 5:
+		{
+			
+		}
+		case 4:
+		{
+			
+		}
+		case 3:
+		{
+			
+		}
+		default:
+		{
+			ReplyToCommand(client, "[SM] Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]");
+			return Plugin_Handled;
+		}
+	}
+	return Plugin_Handled;
 }
 
 /**

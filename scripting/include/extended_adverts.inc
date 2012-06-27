@@ -25,15 +25,67 @@ public SharedPlugin:__pl_adv_adverts =
 
 /**
  * 
+ * Deletes an advert from the advert list
+ * 
+ * @param advertId		The ID of the advert that should be deleted
+ * 
+ * @noreturn
+ * 
+ */
+
+native DeleteAdvert(const String:advertId[]);
+
+#if defined ADVERT_TF2COLORS
+
+/**
+ * 
+ * Reloads the advertisement config.
+ * 
+ * @param ads			Should we reload all the advertisements' config?
+ * @param tsayColors	Should we reload all the topsay colors' config?
+ * @param chatColors	Should we reload all the extra chat colors' config?
+ * 
+ * @note				This is not neccessary for MySQL (Or any other custom) approaches to adding advertisements.
+ * @note				This is only necessary to reload a flatfile configuration.
+ * 
+ * @noreturn
+ * 
+ */
+
+native ReloadAdverts(bool:ads = true, bool:tsayColors = true, bool:chatColors = true);
+
+#else
+
+/**
+ * 
+ * Reloads the advertisement config.
+ * 
+ * @param ads			Should we reload all the advertisements' config?
+ * @param tsayColors	Should we reload all the topsay colors' config?
+ * 
+ * @note				This is not neccessary for MySQL (Or any other custom) approaches to adding advertisements.
+ * @note				This is only necessary to reload a flatfile configuration.
+ * 
+ * @noreturn
+ * 
+ */
+
+native ReloadAdverts(bool:ads = true, bool:tsayColors = true);
+
+#endif
+
+/**
+ * 
  * Shows an advertisement
  * 
  * @param advertId		The ID of the advertisement that needs to be shown. NULL_STRING if you want to show the next advertisement.
+ * @param order			If true, then the position will return to the old order after the new advert has been shown. If false it wont.
  * 
  * @return				True if the advert was shown, false otherwise.
  * 
  */
 
-native ShowAdvert(const String:advertId[] = NULL_STRING);
+native ShowAdvert(const String:advertId[] = NULL_STRING, bool:order = false);
 
 /**
  * 
@@ -157,4 +209,8 @@ public __pl_adv_adverts_SetNTVOptional()
 	MarkNativeAsOptional("AddExtraChatColor");
 #endif
 	MarkNativeAsOptional("Client_CanViewAds");
+	MarkNativeAsOptional("DeleteAdvert");
+	MarkNativeAsOptional("ReloadAdverts");
+	MarkNativeAsOptional("ShowAdvert");
+	MarkNativeAsOptional("AddAdvert");
 }
