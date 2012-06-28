@@ -109,12 +109,13 @@ native bool:ShowAdvert(const String:advertId[] = NULL_STRING, bool:jumpTo = fals
  * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
  * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
  * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont.
+ * @param replace		If true, then it will replace any existing adverts with the same advertId.
  * 
  * @return				True if the advert was successfully created, false if there is already an advert with the same name.
  * 
  */
 
-native bool:AddAdvert(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1, bool:jumpTo = false);
+native bool:AddAdvert(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1, bool:jumpTo = false, bool:replace = false);
 
 /**
  * 
@@ -290,11 +291,12 @@ forward OnAddTopColorPost(const String:colorName[], red, green, blue, alpha, boo
  * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad. (By-Ref)
  * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad. (By-Ref)
  * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont. (By-Ref)
+ * @param replace		If true, then it will replace any existing adverts with the same advertId. (By-Ref)
  * 
  * @return 				Plugin_Continue to allow the advert addition, anything else blocks the advert addition.
  * 
  */
-forward Action:OnAddAdvertPre(String:advertId[], id_ml, String:advertType[], type_ml, String:advertText[], text_ml, &advertFlags, &noFlags, &bool:jumpTo);
+forward Action:OnAddAdvertPre(String:advertId[], id_ml, String:advertType[], type_ml, String:advertText[], text_ml, &advertFlags, &noFlags, &bool:jumpTo, &bool:replace);
 
 
 /**
@@ -307,11 +309,12 @@ forward Action:OnAddAdvertPre(String:advertId[], id_ml, String:advertType[], typ
  * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
  * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
  * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont.
+ * @param replace		If true, then it will replace any existing adverts with the same advertId.
  * 
  * @noreturn
  * 
  */
-forward OnAddAdvertPost(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags, noFlags, const bool:jumpTo);
+forward OnAddAdvertPost(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags, noFlags, const bool:jumpTo, const bool:replace);
 
 
 /**
@@ -340,7 +343,7 @@ forward Action:OnPreDeleteAdvert(String:advertId[], maxlength);
  * 
  */
 
-forward OnPreDeleteAdvert(const String:advertId[]);
+forward OnPostDeleteAdvert(const String:advertId[]);
 
 public __pl_adv_adverts_SetNTVOptional()
 {

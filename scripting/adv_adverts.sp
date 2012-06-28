@@ -234,8 +234,6 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	GetNativeStringLength(1, advertId_ml);
 	decl String:advertId[advertId_ml];
 	GetNativeString(1, advertId, advertId_ml);
-	new bool:jumpTo = GetNativeCell(6);
-	
 	new advertText_ml, advertType_ml;
 	GetNativeStringLength(3, advertText_ml);
 	GetNativeStringLength(2, advertType_ml);
@@ -244,6 +242,8 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	GetNativeString(2, advertType, advertType_ml);
 	new flagBits = GetNativeCell(4);
 	new noFlagBits = GetNativeCell(5);
+	new bool:jumpTo = GetNativeCell(6);
+	new bool:replace = GetNativeCell(7);
 	
 	new Action:returnVal = Plugin_Continue;
 	
@@ -257,15 +257,23 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	Call_PushCellRef(flagBits);
 	Call_PushCellRef(noFlagBits);
 	Call_PushCellRef(jumpTo);
+	Call_PushCellRef(replace);
 	Call_Finish(_:returnVal);
 	
 	if (returnVal != Plugin_Continue)
 		return false;
 	
-	if (!jumpTo)
+	new bool:advertExists = AdvertExists(advertId);
+	
+	if (!jumpTo || (!replace && advertExists))
 		KvSavePosition(g_hAdvertisements);
 	
-	if (KvJumpToKey(g_hAdvertisements, advertId))
+	if (replace && advertExists)
+	{
+		KvJumpToKey(g_hAdvertisements, advertId);
+		KvDeleteThis(g_hAdvertisements);
+	}
+	else if (!replace && advertExists)
 	{
 		KvRewind(g_hAdvertisements);
 		return false;
@@ -288,6 +296,7 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	Call_PushCell(flagBits);
 	Call_PushCell(noFlagBits);
 	Call_PushCell(jumpTo);
+	Call_PushCell(replace);
 	Call_Finish();
 	
 	return true;
@@ -421,8 +430,8 @@ public OnPluginStart()
 	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore, Param_String, Param_Cell);
 	g_hForwardPreAddTopColor = CreateGlobalForward("OnAddTopColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
 	g_hForwardPostAddTopColor = CreateGlobalForward("OnAddTopColorPost", ET_Ignore, Param_String, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
-	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef);
-	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
+	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
 	g_hForwardPreDeleteAdvert = CreateGlobalForward("OnPreDeleteAdvert", ET_Hook, Param_String, Param_Cell);
 	g_hForwardPostDeleteAdvert = CreateGlobalForward("OnPostDeleteAdvert", ET_Ignore, Param_String);
 	
@@ -1011,16 +1020,22 @@ stock parseAdvertisements()
 			new Handle:kv;
 			FileToKeyValues(kv, g_strConfigPath);
 			KvGotoFirstSubKey(kv);
-			decl String:sBuffer[256];
+			decl String:sBuffer[5][256];
 			do
 			{
-				KvGetSectionName(kv, sBuffer, sizeof(sBuffer));
-				KvJumpToKey(g_hAdvertisements, sBuffer, true);
+				KvGetSectionName(kv, sBuffer[4], sizeof(sBuffer[]));
 				for (new i = 0; i < sizeof(g_strKeyValueKeyList); i++)
 				{
-					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer, sizeof(sBuffer), "none");
-					KvSetString(g_hAdvertisements, g_strKeyValueKeyList[i], sBuffer);
+					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer[i], sizeof(sBuffer[]), "none");
 				}
+				new flags = -1, noflags = -1;
+				
+				if (!StrEqual(sBuffer[2], "none"))
+					flags = ReadFlagString(sBuffer[2]);
+				if (!StrEqual(sBuffer[3], "none"))
+					noflags = ReadFlagString(sBuffer[3]);
+				
+				AddAdvert(sBuffer[4], sBuffer[0], sBuffer[1], flags, noflags, false, true);
 			}
 			while (KvGotoNextKey(kv));
 			
