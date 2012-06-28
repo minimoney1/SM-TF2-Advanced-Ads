@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.1.0"
+#define PLUGIN_VERSION "1.2.0"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
