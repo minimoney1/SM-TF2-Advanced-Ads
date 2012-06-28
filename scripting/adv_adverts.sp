@@ -51,7 +51,9 @@ new Handle:g_hForwardPreReplace,
 	Handle:g_hForwardPreAddTopColor,
 	Handle:g_hForwardPostAddTopColor,
 	Handle:g_hForwardPreAddAdvert,
-	Handle:g_hForwardPostAddAdvert;
+	Handle:g_hForwardPostAddAdvert,
+	Handle:g_hForwardPreDeleteAdvert,
+	Handle:g_hForwardPostDeleteAdvert;
 
 new bool:g_bPluginEnabled,
 	bool:g_bExitPanel,
@@ -99,6 +101,14 @@ static String:g_strConVarBoolText[2][5] =
 	"ON"
 };
 
+static String:g_strKeyValueKeyList[4][8] =
+{
+	"type",
+	"text",
+	"flags",
+	"noflags"
+};
+
 public Plugin:myinfo = 
 {
 	name        = "Extended Advertisements",
@@ -120,10 +130,26 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("ShowAdvert", Native_ShowAdvert);
 	CreateNative("ReloadAdverts", Native_ReloadAds);
 	CreateNative("DeleteAdvert", Native_DeleteAdvert);
+	CreateNative("AdvertExists", Native_AdvertExists);
 	#if defined ADVERT_TF2COLORS
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
+}
+
+public Native_AdvertExists(Handle:plugin, numParams)
+{
+	new ml;
+	GetNativeStringLength(1, ml);
+	decl String:id[ml];
+	GetNativeString(1, id, ml);
+	KvSavePosition(g_hAdvertisements);
+	if (KvJumpToKey(g_hAdvertisements, id))
+	{
+		KvRewind(g_hAdvertisements);
+		return true;
+	}
+	return false;
 }
 
 public Native_DeleteAdvert(Handle:plugin, numParams)
@@ -132,11 +158,24 @@ public Native_DeleteAdvert(Handle:plugin, numParams)
 	GetNativeStringLength(1, ml);
 	decl String:id[ml];
 	GetNativeString(1, id, ml);
-	KvSavePosition(kv);
+	
+	new Action:returnVal = Plugin_Continue;
+	Call_StartForward(g_hForwardPreDeleteAdvert);
+	Call_PushStringEx(id, ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(ml);
+	Call_Finish(_:returnVal);
+	
+	if (returnVal != Plugin_Continue)
+		return false;
+	
+	KvSavePosition(g_hAdvertisements);
 	if (KvJumpToKey(g_hAdvertisements, id))
 	{
 		KvDeleteThis(g_hAdvertisements);
 		KvRewind(g_hAdvertisements);
+		Call_StartForward(g_hForwardPostDeleteAdvert);
+		Call_PushString(id);
+		Call_Finish();
 		return true;
 	}
 	return false;
@@ -178,7 +217,7 @@ public Native_ShowAdvert(Handle:plugin, numParams)
 	new bool:order = GetNativeCell(2);
 	if (order)
 		KvSavePosition(g_hAdvertisements);
-	if (advertId != NULL_STRING)
+	if (strcmp(advertId, NULL_STRING, false) != 0)
 	{
 		if (!KvJumpToKey(g_hAdvertisements, advertId))
 			return false;
@@ -195,16 +234,7 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	GetNativeStringLength(1, advertId_ml);
 	decl String:advertId[advertId_ml];
 	GetNativeString(1, advertId, advertId_ml);
-	
-	KvSavePosition(g_hAdvertisements);
-	
-	if (KvJumpToKey(g_hAdvertisements, sectionName))
-	{
-		KvRewind(g_hAdvertisements);
-		return false;
-	}
-	
-	KvJumpToKey(g_hAdvertisements, sectionName, true);
+	new bool:jumpTo = GetNativeCell(6);
 	
 	new advertText_ml, advertType_ml;
 	GetNativeStringLength(3, advertText_ml);
@@ -215,43 +245,129 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	new flagBits = GetNativeCell(4);
 	new noFlagBits = GetNativeCell(5);
 	
-	KvSetString(g_hAdvertisements, "type", advertType);
-	KvSetString(g_hAdvertisements, "text", advertText);
-	KvSetNum(g_hAdvertisements, "flags", flagBits);
-	KvSetNum(g_hAdvertisements, "noflags", noFlagBits);
+	new Action:returnVal = Plugin_Continue;
 	
-	KvRewind(g_hAdvertisements);
+	Call_StartForward(g_hForwardPreAddAdvert);
+	Call_PushStringEx(advertId, advertId_ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(advertId_ml);
+	Call_PushStringEx(advertType, advertType_ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(advertType_ml);
+	Call_PushStringEx(advertText, advertText_ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(advertText_ml);
+	Call_PushCellRef(flagBits);
+	Call_PushCellRef(noFlagBits);
+	Call_PushCellRef(jumpTo);
+	Call_Finish(_:returnVal);
+	
+	if (returnVal != Plugin_Continue)
+		return false;
+	
+	if (!jumpTo)
+		KvSavePosition(g_hAdvertisements);
+	
+	if (KvJumpToKey(g_hAdvertisements, advertId))
+	{
+		KvRewind(g_hAdvertisements);
+		return false;
+	}
+	
+	KvJumpToKey(g_hAdvertisements, advertId, true);
+	
+	KvSetString(g_hAdvertisements, g_strKeyValueKeyList[0], advertType);
+	KvSetString(g_hAdvertisements, g_strKeyValueKeyList[1], advertText);
+	KvSetNum(g_hAdvertisements, g_strKeyValueKeyList[2], flagBits);
+	KvSetNum(g_hAdvertisements, g_strKeyValueKeyList[3], noFlagBits);
+	
+	if (!jumpTo)
+		KvRewind(g_hAdvertisements);
+	
+	Call_StartForward(g_hForwardPostAddAdvert);
+	Call_PushString(advertId);
+	Call_PushString(advertType);
+	Call_PushString(advertText);
+	Call_PushCell(flagBits);
+	Call_PushCell(noFlagBits);
+	Call_PushCell(jumpTo);
+	Call_Finish();
 	
 	return true;
 }
 
 public Native_AddTopColorToTrie(Handle:plugin, numParams)
 {
-	decl String:colorName[128], colorName_maxLength;
+	new colorName_maxLength;
 	GetNativeStringLength(1, colorName_maxLength);
+	decl String:colorName[colorName_maxLength];
 	GetNativeString(1, colorName, colorName_maxLength);
 	new red = GetNativeCell(2),
 		blue = GetNativeCell(3),
 		green = GetNativeCell(4),
 		alpha = GetNativeCell(5);
-	new bool:replace = GetNativeCell(6) ? true : false;
+	new bool:replace = GetNativeCell(6);
+	
+	new Action:fReturn = Plugin_Continue;
+	Call_StartForward(g_hForwardPreAddTopColor);
+	Call_PushStringEx(colorName, colorName_maxLength, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(colorName_maxLength);
+	Call_PushCellRef(red);
+	Call_PushCellRef(green);
+	Call_PushCellRef(blue);
+	Call_PushCellRef(alpha);
+	Call_PushCellRef(replace);
+	Call_Finish(_:fReturn);
+	
+	if (fReturn != Plugin_Continue)
+	{
+		return false;
+	}
+	
 	new color[4];
 	color[0] = red;
 	color[1] = blue;
 	color[2] = green;
 	color[3] = alpha;
-	return SetTrieArray(g_hTopColorTrie, colorName, color, 4, replace);
+	
+	new returnVal = SetTrieArray(g_hTopColorTrie, colorName, color, 4, replace);
+	
+	Call_StartForward(g_hForwardPostAddTopColor);
+	Call_PushString(colorName);
+	Call_PushCell(red);
+	Call_PushCell(green);
+	Call_PushCell(blue);
+	Call_PushCell(alpha);
+	Call_PushCell(replace);
+	Call_Finish();
+	
+	return returnVal;
 }
 
 #if defined ADVERT_TF2COLORS
 public Native_AddChatColorToTrie(Handle:plugin, numParams)
 {
-	decl String:colorName[128], colorName_maxLength;
+	new colorName_maxLength;
 	GetNativeStringLength(1, colorName_maxLength);
+	decl String:colorName[colorName_maxLength];
 	GetNativeString(1, colorName, colorName_maxLength);
 	new hex = GetNativeCell(2);
 	
-	return CAddColor(colorName, hex);
+	new Action:callReturn = Plugin_Continue;
+	Call_StartForward(g_hForwardPreAddChatColor);
+	Call_PushStringEx(colorName, colorName_maxLength, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(colorName_maxLength);
+	Call_PushCellRef(hex);
+	Call_Finish(_:callReturn);
+	
+	if (callReturn != Plugin_Continue)
+		return false;
+	
+	new bool:returnVal = CAddColor(colorName, hex);
+	
+	Call_StartForward(g_hForwardPostAddChatColor);
+	Call_PushString(colorName);
+	Call_PushCell(hex);
+	Call_Finish();
+	
+	return returnVal;
 }
 #endif
 
@@ -284,9 +400,8 @@ public OnPluginStart()
 	InitiConfiguration();
 	
 	if (g_hPluginEnabled)
-	{
 		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
-	}
+
 	
 	LoadTranslations("extended_advertisements.phrases");
 	
@@ -294,6 +409,7 @@ public OnPluginStart()
 	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_ROOT);
 	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_ROOT);
 	RegAdminCmd("sm_addadvert", Command_AddAdvert, ADMFLAG_ROOT);
+	RegAdminCmd("sm_deladd", Command_DeleteAdvert, ADMFLAG_ROOT);
 	
 	
 	AutoExecConfig();
@@ -301,47 +417,85 @@ public OnPluginStart()
 	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
-	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook);
-	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore);
-	g_hForwardPreAddTopColor = CreateGlobalForward("OnAddTopColorPre", ET_Hook);
-	g_hForwardPostAddTopColor = CreateGlobalForward("OnAddTopColorPost", ET_Ignore);
-	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook);
-	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore);
+	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef);
+	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore, Param_String, Param_Cell);
+	g_hForwardPreAddTopColor = CreateGlobalForward("OnAddTopColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
+	g_hForwardPostAddTopColor = CreateGlobalForward("OnAddTopColorPost", ET_Ignore, Param_String, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef);
+	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardPreDeleteAdvert = CreateGlobalForward("OnPreDeleteAdvert", ET_Hook, Param_String, Param_Cell);
+	g_hForwardPostDeleteAdvert = CreateGlobalForward("OnPostDeleteAdvert", ET_Ignore, Param_String);
 	
 	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
 	if (LibraryExists("updater"))
-	{
 		Updater_AddPlugin(UPDATE_URL);
-	}
 }
 
 stock bool:IsGameCompatible()
 {
-	new sdkversion = GuessSDKVersion();
-	if (SOURCE_SDK_EPISODE2VALVE <= sdkversion < SOURCE_SDK_LEFT4DEAD || sdkversion >= SOURCE_SDK_CSGO)
+	/*new sdkversion = GuessSDKVersion();
+	if (SOURCE_SDK_EPISODE2VALVE <= sdkversion < SOURCE_SDK_LEFT4DEAD || sdkversion >= SOURCE_SDK_CSGO)*/
+	if (SOURCE_SDK_EPISODE2VALVE <= GuessSDKVersion() < SOURCE_SDK_LEFT4DEAD)
 		return true;
 	return false;
 }
 
-// [SM] Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]
-public Command_AddAdvert(client, args)
+// [SM] Usage: sm_deladvert <Advert Id>
+public Action:Command_DeleteAdvert(client, args)
 {
+	if (args < 1)
+	{
+		ReplyToCommand(client, "[SM] Usage: sm_deladvert <Advert Id>");
+		return Plugin_Handled;
+	}
+	decl String:arg[256];
+	GetCmdArgString(arg, sizeof(arg));
+	StripQuotes(arg);
+	if (DeleteAdvert(arg))
+		ReplyToCommand(client, "[SM] Advert Id \"%s\" was successfully deleted!", arg);
+	else
+		ReplyToCommand(client, "[SM] Advert Id \"%s\" was not found!", arg);
+	return Plugin_Handled;
+}
+
+// [SM] Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]
+public Action:Command_AddAdvert(client, args)
+{
+	decl String:arg[5][256];
 	switch (args)
 	{
 		case 5:
 		{
+			for (new i = 0; i <= args; i++)
+			{
+				GetCmdArg(i, arg[i], sizeof(arg[]));
+			}
+			new flagBits = ReadFlagString(arg[3]),
+				noFlagBits = ReadFlagString(arg[4]);
 			
+			AddAdvert(arg[0], arg[1], arg[2], flagBits, noFlagBits);
 		}
 		case 4:
 		{
+			for (new i = 0; i <= args; i++)
+			{
+				GetCmdArg(i, arg[i], sizeof(arg[]));
+			}
+			new flagBits = ReadFlagString(arg[3]);
 			
+			AddAdvert(arg[0], arg[1], arg[2], flagBits);
 		}
 		case 3:
 		{
+			for (new i = 0; i <= args; i++)
+			{
+				GetCmdArg(i, arg[i], sizeof(arg[]));
+			}
 			
+			AddAdvert(arg[0], arg[1], arg[2]);
 		}
 		default:
 		{
@@ -372,9 +526,7 @@ stock format_time(timestamp, String: formatted_time[192])
 public OnLibraryAdded(const String:name[])
 {
 	if (StrEqual(name, "updater"))
-	{
 		Updater_AddPlugin(UPDATE_URL);
-	}
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 }
@@ -382,9 +534,7 @@ public OnLibraryAdded(const String:name[])
 public OnLibraryRemoved(const String:name[])
 {
 	if (StrEqual(name, "updater"))
-	{
 		Updater_RemovePlugin();
-	}
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 }
@@ -431,9 +581,7 @@ public OnConfigsExecuted()
 	else
 	{
 		if (g_hAdvertTimer == INVALID_HANDLE)
-		{
 			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
-		}
 	}
 }
 
@@ -450,9 +598,7 @@ public OnMapStart()
 	else
 	{
 		if (g_hAdvertTimer == INVALID_HANDLE)
-		{
 			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
-		}
 	}
 }
 
@@ -564,10 +710,10 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			noFlagBits = -1;
 		
 		KvGetSectionName(g_hAdvertisements, sectionName, sizeof(sectionName));
-		KvGetString(g_hAdvertisements, "type",  sType,  sizeof(sType));
-		KvGetString(g_hAdvertisements, "text",  sText,  sizeof(sText));
-		KvGetString(g_hAdvertisements, "noflags", noFlags, sizeof(noFlags), "none");
-		KvGetString(g_hAdvertisements, "flags", sFlags, sizeof(sFlags), "none");
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[0],  sType,  sizeof(sType), "none");
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[1],  sText,  sizeof(sText), "none");
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[2], sFlags, sizeof(sFlags), "none");
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[3], noFlags, sizeof(noFlags), "none");
 		
 		if (!KvGotoNextKey(g_hAdvertisements)) 
 		{
@@ -862,8 +1008,22 @@ stock parseAdvertisements()
 		
 		if (FileExists(g_strConfigPath)) 
 		{
-			FileToKeyValues(g_hAdvertisements, g_strConfigPath);
-			KvGotoFirstSubKey(g_hAdvertisements);
+			new Handle:kv;
+			FileToKeyValues(kv, g_strConfigPath);
+			KvGotoFirstSubKey(kv);
+			decl String:sBuffer[256];
+			do
+			{
+				KvGetSectionName(kv, sBuffer, sizeof(sBuffer));
+				KvJumpToKey(g_hAdvertisements, sBuffer, true);
+				for (new i = 0; i < sizeof(g_strKeyValueKeyList); i++)
+				{
+					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer, sizeof(sBuffer), "none");
+					KvSetString(g_hAdvertisements, g_strKeyValueKeyList[i], sBuffer);
+				}
+			}
+			while (KvGotoNextKey(kv));
+			
 		} 
 		else 
 		{
@@ -1297,4 +1457,5 @@ stock Server_GetIPNumString(String:ipBuffer[], ipBuffer_maxLength, bool:useSteam
 public OnPluginEnd()
 {
 	CloseHandle(g_hAdvertisements);
+	CloseHandle(g_hTopColorTrie);
 }

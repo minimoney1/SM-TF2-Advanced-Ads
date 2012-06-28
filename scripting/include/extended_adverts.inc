@@ -25,15 +25,27 @@ public SharedPlugin:__pl_adv_adverts =
 
 /**
  * 
+ * Checks whether an advetisements exists or not.
+ * 
+ * @param advertId		The ID of the advert that is being checked against
+ * 
+ * @return				True if the advert exists, false otherwise.
+ * 
+ */
+
+native bool:AdvertExists(const String:advertId[]);
+
+/**
+ * 
  * Deletes an advert from the advert list
  * 
  * @param advertId		The ID of the advert that should be deleted
  * 
- * @noreturn
+ * @return				True on success, false otherwise (May be because of other interfereing plugins).
  * 
  */
 
-native DeleteAdvert(const String:advertId[]);
+native bool:DeleteAdvert(const String:advertId[]);
 
 #if defined ADVERT_TF2COLORS
 
@@ -79,13 +91,13 @@ native ReloadAdverts(bool:ads = true, bool:tsayColors = true);
  * Shows an advertisement
  * 
  * @param advertId		The ID of the advertisement that needs to be shown. NULL_STRING if you want to show the next advertisement.
- * @param order			If true, then the position will return to the old order after the new advert has been shown. If false it wont.
+ * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont.
  * 
  * @return				True if the advert was shown, false otherwise.
  * 
  */
 
-native ShowAdvert(const String:advertId[] = NULL_STRING, bool:order = false);
+native bool:ShowAdvert(const String:advertId[] = NULL_STRING, bool:jumpTo = false);
 
 /**
  * 
@@ -96,18 +108,19 @@ native ShowAdvert(const String:advertId[] = NULL_STRING, bool:order = false);
  * @param advertText	The unedited string (with tags) of the advertisement
  * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
  * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
+ * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont.
  * 
  * @return				True if the advert was successfully created, false if there is already an advert with the same name.
  * 
  */
 
-native AddAdvert(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1);
+native bool:AddAdvert(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1, bool:jumpTo = false);
 
 /**
  * 
  * Adds a color to the top colors trie.
  * 
- * @param colorName		The color name (Without braces), this is the name that you will use inside of the '{' and '}' tags in the config.
+ * @param colorName		The color name (without curly brackets), this is the name that you will use inside of the '{' and '}' tags in the config.
  * @param red			The red value.
  * @param green			The green value
  * @param blue			The blue value
@@ -118,7 +131,7 @@ native AddAdvert(const String:advertId[], const String:advertType[], const Strin
  * 
  */
 
-native AddExtraTopColor(String:colorName[], red, green, blue, alpha, bool:replace = true);
+native bool:AddExtraTopColor(String:colorName[], red, green, blue, alpha, bool:replace = true);
 
 /**
  * 
@@ -139,14 +152,14 @@ native bool:Client_CanViewAds(client, flagBits = -1, noFlagBits = -1);
  * 
  * Adds a color to the extra chat colors trie.
  * 
- * @param colorName		The color name (Without braces), this is the name that you will use inside of the '{' and '}' tags in the config.
+ * @param colorName		The color name (without curly brackets), this is the name that you will use inside of the '{' and '}' tags in the config.
  * @param hex			The exadecimal representation of the color (0xRRGGBB)
  * 
  * @note				To use this native, you need to have #define ADVERT_TOPCOLORS before including this file.
  * 
- * @return				True if the color was added, false if a color with an equal name was found
+ * @return				True if the color was added, false if a color with an equal name was found or another issue occured (Such as a blockage by an external plugin)
  */
-native AddExtraChatColor(String:colorName[], hex);
+native bool:AddExtraChatColor(String:colorName[], hex);
 #endif
 
 
@@ -201,16 +214,143 @@ forward bool:OnAdvertPreClientReplace(client, const String:advertId[], const Str
  */
 forward OnPostAdvertisementShown(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags);
 
+#if defined ADVERT_TF2COLORS
+/**
+ * 
+ * Called right before an extra chat color is added.
+ * 
+ * @param colorName		The color's name without curly brackets (By Ref)
+ * @param maxlength		The maxlength of the colorName string.
+ * @param hex			The hexadecimal represenation of the color. (By Ref)
+ * 
+ * @return 				Plugin_Continue to allow the color addition, anything else blocks the color addition.
+ * 
+ */
+
+forward Action:OnAddChatColorPre(String:colorName[], maxlength, &hex);
+
+/**
+ * 
+ * Called right after an extra chat color is added.
+ * 
+ * @param colorName		The color's name (without curly brackets)
+ * @param hex			The hexadecimal represenation of the color.
+ * 
+ * @noreturn
+ * 
+ */
+
+forward OnAddChatColorPost(const String:colorName[], &hex);
+
+#endif
+
+/**
+ * 
+ * Called right before an extra top color is added.
+ * 
+ * @param colorName		The color name (without curly brackets), this is the name that you will use inside of the '{' and '}' tags in the config. (By-Ref)
+ * @param maxlength		The maxlength of the colorName string.
+ * @param red			The red value. (By-Ref)
+ * @param green			The green value. (By-Ref)
+ * @param blue			The blue value. (By-Ref)
+ * @param alpha			The alpha value. (By-Ref)
+ * @param replace		If a color with an equal name was found, should we replace it? (By-Ref)
+ * 
+ * @return 				Plugin_Continue to allow the color addition, anything else blocks the color addition.
+ * 
+ */
+forward Action:OnAddTopColorPre(String:colorName[], maxlength, &red, &green, &blue, &alpha, &bool:replace);
+
+/**
+ * 
+ * Called right after an extra top color is added.
+ * 
+ * @param colorName		The color name (without curly brackets), this is the name that you will use inside of the '{' and '}' tags in the config.
+ * @param red			The red value.
+ * @param green			The green value
+ * @param blue			The blue value
+ * @param alpha			The alpha value
+ * @param replace		If a color with an equal name was found, should we replace it?
+ * 
+ * @noreturn
+ * 
+ */
+forward OnAddTopColorPost(const String:colorName[], red, green, blue, alpha, bool:replace);
+
+/**
+ * 
+ * Called right before an advert is added
+ * 
+ * @param advertId		The ID of the advertisement (As a string, does not need to be numerical) (By-Ref)
+ * @param id_ml			The maxlength of the advertId parameter
+ * @param advertType	The string that contains the letters for the type of the advertisement (By-Ref)
+ * @param type_ml		The maxlength of the advertType parameter
+ * @param advertText	The unedited string (with tags) of the advertisement (By-Ref)
+ * @param text_ml		The maxlength of the advertText parameter
+ * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad. (By-Ref)
+ * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad. (By-Ref)
+ * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont. (By-Ref)
+ * 
+ * @return 				Plugin_Continue to allow the advert addition, anything else blocks the advert addition.
+ * 
+ */
+forward Action:OnAddAdvertPre(String:advertId[], id_ml, String:advertType[], type_ml, String:advertText[], text_ml, &advertFlags, &noFlags, &bool:jumpTo);
+
+
+/**
+ * 
+ * Called right before an advert is added
+ * 
+ * @param advertId		The ID of the advertisement (As a string, does not need to be numerical)
+ * @param advertType	The string that contains the letters for the type of the advertisement
+ * @param advertText	The unedited string (with tags) of the advertisement
+ * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
+ * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
+ * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont.
+ * 
+ * @noreturn
+ * 
+ */
+forward OnAddAdvertPost(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags, noFlags, const bool:jumpTo);
+
+
+/**
+ * 
+ * Called right before an advert is deleted
+ * 
+ * @param advertId		The ID of the advertisement (As a string, does not need to be numerical) (By-Ref)
+ * @param maxlength		The maxlength of the advertId parameter.
+ * 
+ * @note				Please keep in mind that this forward gets called before any checks have been applied.
+ * @note				You will need to use checks such as AdvertExists() if you want to use this forward effectively.
+ * 
+ * @return				Plugin_Continue to allow the advert deletion, anything else blocks the advert deletion.
+ * 
+ */
+
+forward Action:OnPreDeleteAdvert(String:advertId[], maxlength);
+
+/**
+ * 
+ * Called right after an advert is deleted
+ * 
+ * @param advertId		The ID of the advertisement (As a string, does not need to be numerical)
+ * 
+ * @return				Plugin_Continue to allow the advert deletion, anything else blocks the advert deletion.
+ * 
+ */
+
+forward OnPreDeleteAdvert(const String:advertId[]);
 
 public __pl_adv_adverts_SetNTVOptional()
 {
 	MarkNativeAsOptional("AddExtraTopColor");
-#if defined ADVERT_TF2COLORS
-	MarkNativeAsOptional("AddExtraChatColor");
-#endif
 	MarkNativeAsOptional("Client_CanViewAds");
 	MarkNativeAsOptional("DeleteAdvert");
 	MarkNativeAsOptional("ReloadAdverts");
 	MarkNativeAsOptional("ShowAdvert");
 	MarkNativeAsOptional("AddAdvert");
+#if defined ADVERT_TF2COLORS
+	MarkNativeAsOptional("AddExtraChatColor");
+#endif
 }
