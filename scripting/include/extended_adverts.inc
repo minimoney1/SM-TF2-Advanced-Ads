@@ -111,7 +111,7 @@ native bool:ShowAdvert(const String:advertId[] = NULL_STRING, bool:jumpTo = fals
  * @param jumpTo		If true, then the position will return to the old order after the new advert has been shown. If false it wont.
  * @param replace		If true, then it will replace any existing adverts with the same advertId.
  * 
- * @return				True if the advert was successfully created, false if there is already an advert with the same name.
+ * @return				True if the advert was successfully created, false if there is already an advert with the same name and was not replaced.
  * 
  */
 

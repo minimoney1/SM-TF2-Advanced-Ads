@@ -4,20 +4,16 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.1.0"
+			"Latest"	"1.2.0"
 		}
 		
-		"Notes"	"The extra_ad_colors.txt has been renamed to extra_chat_colors.txt, please make sure you port all your extra chat colors from the old file to the new one."
-		"Notes"	"Added 'showcount' parameter to the config"
-		"Notes"	"Removed case-sensitivity on all the tags."
+		"Notes"	"Fixed Major Bugs"
 	}
 	
 	"Files"
 	{
 		"Plugin"	"Path_SM/plugins/adv_adverts_tf2.smx"
 		"Plugin"	"Path_SM/translations/extended_advertisements.phrases.txt"
-		"Plugin"	"Path_SM/configs/extra_chat_colors.txt"
-		"Plugin"	"Path_SM/configs/extra_tsay_colors.txt"
 		
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
 		"Source"	"Path_SM/scripting/include/extended_adverts.inc"

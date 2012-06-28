@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-#define ADVERT_TF2COLORS
+//#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -45,10 +45,12 @@ new Handle:g_hTopColorTrie = INVALID_HANDLE;
 
 new Handle:g_hForwardPreReplace,
 	Handle:g_hForwardPreClientReplace,
-	Handle:g_hForwardPostAdvert,
-	Handle:g_hForwardPreAddChatColor,
-	Handle:g_hForwardPostAddChatColor,
-	Handle:g_hForwardPreAddTopColor,
+	Handle:g_hForwardPostAdvert;
+#if defined ADVERT_TF2COLORS	
+new	Handle:g_hForwardPreAddChatColor,
+	Handle:g_hForwardPostAddChatColor;
+#endif
+new	Handle:g_hForwardPreAddTopColor,
 	Handle:g_hForwardPostAddTopColor,
 	Handle:g_hForwardPreAddAdvert,
 	Handle:g_hForwardPostAddAdvert,
@@ -426,8 +428,10 @@ public OnPluginStart()
 	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
+#if defined ADVERT_TF2COLORS	
 	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef);
 	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore, Param_String, Param_Cell);
+#endif
 	g_hForwardPreAddTopColor = CreateGlobalForward("OnAddTopColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
 	g_hForwardPostAddTopColor = CreateGlobalForward("OnAddTopColorPost", ET_Ignore, Param_String, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
 	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
@@ -457,16 +461,16 @@ public Action:Command_DeleteAdvert(client, args)
 {
 	if (args < 1)
 	{
-		ReplyToCommand(client, "[SM] Usage: sm_deladvert <Advert Id>");
+		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Usage");
 		return Plugin_Handled;
 	}
 	decl String:arg[256];
 	GetCmdArgString(arg, sizeof(arg));
 	StripQuotes(arg);
 	if (DeleteAdvert(arg))
-		ReplyToCommand(client, "[SM] Advert Id \"%s\" was successfully deleted!", arg);
+		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Success", arg);
 	else
-		ReplyToCommand(client, "[SM] Advert Id \"%s\" was not found!", arg);
+		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Fail", arg);
 	return Plugin_Handled;
 }
 
@@ -485,7 +489,10 @@ public Action:Command_AddAdvert(client, args)
 			new flagBits = ReadFlagString(arg[3]),
 				noFlagBits = ReadFlagString(arg[4]);
 			
-			AddAdvert(arg[0], arg[1], arg[2], flagBits, noFlagBits);
+			if (AddAdvert(arg[0], arg[1], arg[2], flagBits, noFlagBits))
+				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+			else
+				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		case 4:
 		{
@@ -495,7 +502,10 @@ public Action:Command_AddAdvert(client, args)
 			}
 			new flagBits = ReadFlagString(arg[3]);
 			
-			AddAdvert(arg[0], arg[1], arg[2], flagBits);
+			if (AddAdvert(arg[0], arg[1], arg[2], flagBits))
+				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+			else
+				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		case 3:
 		{
@@ -504,11 +514,14 @@ public Action:Command_AddAdvert(client, args)
 				GetCmdArg(i, arg[i], sizeof(arg[]));
 			}
 			
-			AddAdvert(arg[0], arg[1], arg[2]);
+			if (AddAdvert(arg[0], arg[1], arg[2]))
+				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+			else
+				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		default:
 		{
-			ReplyToCommand(client, "[SM] Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]");
+			ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Usage");
 			return Plugin_Handled;
 		}
 	}
@@ -981,7 +994,7 @@ public Action:Command_ShowAd(client, args)
 		StripQuotes(arg);
 		if (!ShowAdvert(arg))
 		{
-			ReplyToCommand(client, "[SM] The given advertisement was not found.");
+			ReplyToCommand(client, "%T %T", "Advert_Tag", "ShowAd_NotFound");
 			return Plugin_Handled;
 		}
 	}
@@ -1004,7 +1017,7 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		CPrintToChat(client, "%t %t", "Advert_Tag", "Config_Reloaded");
+		CPrintToChat(client, "%T %T", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
