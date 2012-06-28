@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-//#define ADVERT_TF2COLORS
+#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.0"
+#define PLUGIN_VERSION "1.2.1"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -1030,7 +1030,7 @@ stock parseAdvertisements()
 		
 		if (FileExists(g_strConfigPath)) 
 		{
-			new Handle:kv;
+			new Handle:kv = CreateKeyValues("Advertisements");
 			FileToKeyValues(kv, g_strConfigPath);
 			KvGotoFirstSubKey(kv);
 			decl String:sBuffer[5][256];
@@ -1051,7 +1051,7 @@ stock parseAdvertisements()
 				AddAdvert(sBuffer[4], sBuffer[0], sBuffer[1], flags, noflags, false, true);
 			}
 			while (KvGotoNextKey(kv));
-			
+			CloseHandle(kv);
 		} 
 		else 
 		{

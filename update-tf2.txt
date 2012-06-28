@@ -4,17 +4,16 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.2.0"
+			"Latest"	"1.2.1"
 		}
 		
-		"Notes"	"Fixed Major Bugs"
+		"Notes"	"Fixed FileTOKeyValues bug"
 	}
 	
 	"Files"
 	{
 		"Plugin"	"Path_SM/plugins/adv_adverts_tf2.smx"
-		"Plugin"	"Path_SM/translations/extended_advertisements.phrases.txt"
-		
+
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
 		"Source"	"Path_SM/scripting/include/extended_adverts.inc"
 	}
