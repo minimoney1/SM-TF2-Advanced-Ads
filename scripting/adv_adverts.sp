@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-//#define ADVERT_TF2COLORS
+#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.2"
+#define PLUGIN_VERSION "1.2.3"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -417,10 +417,10 @@ public OnPluginStart()
 	LoadTranslations("extended_advertisements.phrases");
 	
 	
-	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_ROOT);
-	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_ROOT);
-	RegAdminCmd("sm_addadvert", Command_AddAdvert, ADMFLAG_ROOT);
-	RegAdminCmd("sm_deladd", Command_DeleteAdvert, ADMFLAG_ROOT);
+	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_RCON);
+	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_RCON);
+	RegAdminCmd("sm_addadvert", Command_AddAdvert, ADMFLAG_RCON);
+	RegAdminCmd("sm_deladd", Command_DeleteAdvert, ADMFLAG_RCON);
 	
 	
 	AutoExecConfig();
@@ -1017,7 +1017,10 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		CPrintToChat(client, "%T %T", "Advert_Tag", "Config_Reloaded");
+		if (client == 0)
+			PrintToServer("%T %T", "Advert_Tag", "Config_Reloaded");
+		else
+			CPrintToChat(client, "%T %T", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
