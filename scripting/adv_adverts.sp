@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-//#define ADVERT_TF2COLORS
+#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.4"
+#define PLUGIN_VERSION "1.2.5"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -116,7 +116,7 @@ public Plugin:myinfo =
 	name        = "Extended Advertisements",
 	author      = "Mini",
 	description = "Extended advertisement system for TF2's new color abilities for developers",
-	version     = EXT_ADVERT_VERSION,
+	version     = PLUGIN_VERSION,
 	url         = "http://forums.alliedmods.net/"
 };
 
@@ -384,7 +384,7 @@ public Native_AddChatColorToTrie(Handle:plugin, numParams)
 
 public OnPluginStart()
 {
-	CreateConVar("extended_advertisements_version", EXT_ADVERT_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("extended_advertisements_version", PLUGIN_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
 	#if defined ADVERT_TF2COLORS
 	if (!IsGameCompatible())
@@ -601,6 +601,11 @@ public OnConfigsExecuted()
 	}
 	else
 	{
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
 		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 	}
 }
@@ -617,8 +622,12 @@ public OnMapStart()
 	}
 	else
 	{
-		if (g_hAdvertTimer == INVALID_HANDLE)
-			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
+		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 	}
 }
 
@@ -688,6 +697,11 @@ public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newVa
 		}
 		else
 		{
+			if (g_hAdvertTimer != INVALID_HANDLE)
+			{
+				KillTimer(g_hAdvertTimer);
+				g_hAdvertTimer = INVALID_HANDLE;
+			}
 			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 		}
 	}
@@ -707,6 +721,11 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 	}
 	else
 	{
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
 		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 	}
 }
@@ -879,7 +898,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			new index = 0;
 			first = FindCharInString(sBuffer[index], '{');
 			last = FindCharInString(sBuffer[index], '}');
-			if (first != -1 || last != -1) 
+			if (first != -1 && last != -1) 
 			{
 				first++;
 				last--;
@@ -1021,7 +1040,7 @@ public Action:Command_ReloadAds(client, args)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
 		if (client == 0)
-			PrintToServer("%T %T", "Advert_Tag", "Config_Reloaded");
+			PrintToServer("[SM] %The advertisement config has been reloaded!");
 		else
 			CPrintToChat(client, "%T %T", "Advert_Tag", "Config_Reloaded");
 	}
@@ -1246,7 +1265,9 @@ stock ReplaceClientText(client, const String:inputText[], String:outputText[], o
 		decl String:strTemp[256];
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
-			GetClientName(client, strTemp, sizeof(strTemp));
+			//GetClientName(client, strTemp, sizeof(strTemp));
+			// Workaround for names not showing (?)
+			GetClientInfo(client, "name", strTemp, sizeof(strTemp));
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
@@ -1441,7 +1462,7 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 
 stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:ignoreChat = false, bool:ignoreTop = false, bool:ignoreRawTag = false)
 {
-	if (!ignoreChat)
+	/*if (!ignoreChat)
 		CRemoveTags(inputString, inputString_maxLength);
 	if (!ignoreTop)
 		removeTopColors(inputString, inputString_maxLength, ignoreChat);
@@ -1452,7 +1473,7 @@ stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:i
 			if (StrContains(inputString, g_tagRawText[i], false) != -1)
 				ReplaceString(inputString, inputString_maxLength, g_tagRawText[i], "", false);
 		}
-	}
+	}*/
 }
 
 /** 

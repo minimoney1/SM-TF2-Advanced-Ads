@@ -2,18 +2,6 @@
 	#endinput
 #endif
 
-#define _extended_adverts_included
-
-#if defined ADVERT_TF2COLORS
-
-#define EXT_ADVERT_VERSION "1.1.1-tf2"
-
-#else
-
-#define EXT_ADVERT_VERSION "1.1.1-nontf2"
-
-#endif
-
 public SharedPlugin:__pl_adv_adverts = 
 {
 	name = "adv_adverts",
