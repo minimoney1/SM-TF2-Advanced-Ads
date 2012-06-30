@@ -1,3 +1,9 @@
+#if defined _extended_adverts_included
+	#endinput
+#endif
+
+#define _extended_adverts_included
+
 #if defined ADVERT_TF2COLORS
 
 #define EXT_ADVERT_VERSION "1.1.1-tf2"

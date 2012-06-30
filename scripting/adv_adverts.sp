@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-#define ADVERT_TF2COLORS
+//#define ADVERT_TF2COLORS
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.3"
+#define PLUGIN_VERSION "1.2.4"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
@@ -409,9 +409,6 @@ public OnPluginStart()
 	#endif
 	
 	InitiConfiguration();
-	
-	if (g_hPluginEnabled)
-		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 
 	
 	LoadTranslations("extended_advertisements.phrases");
@@ -447,6 +444,7 @@ public OnPluginStart()
 		Updater_AddPlugin(UPDATE_URL);
 }
 
+#if defined ADVERT_TF2COLORS
 stock bool:IsGameCompatible()
 {
 	/*new sdkversion = GuessSDKVersion();
@@ -455,6 +453,7 @@ stock bool:IsGameCompatible()
 		return true;
 	return false;
 }
+#endif
 
 // [SM] Usage: sm_deladvert <Advert Id>
 public Action:Command_DeleteAdvert(client, args)
@@ -602,8 +601,7 @@ public OnConfigsExecuted()
 	}
 	else
 	{
-		if (g_hAdvertTimer == INVALID_HANDLE)
-			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 	}
 }
 
@@ -675,19 +673,20 @@ public OnExtraChatColorsPathChange(Handle:conVar, const String:oldValue[], const
 #endif
 public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
-	g_bPluginEnabled = StringToInt(newValue) ? true : false;
-	
-	if (!g_bPluginEnabled)
+	new bool:newVal = StringToInt(newValue) ? true : false,
+		bool:oldVal = StringToInt(oldValue) ? true : false;
+	g_bPluginEnabled = newVal;
+	if (newVal != oldVal)
 	{
-		if (g_hAdvertTimer != INVALID_HANDLE)
+		if (!newVal)
 		{
-			KillTimer(g_hAdvertTimer);
-			g_hAdvertTimer = INVALID_HANDLE;
+			if (g_hAdvertTimer != INVALID_HANDLE)
+			{
+				KillTimer(g_hAdvertTimer);
+				g_hAdvertTimer = INVALID_HANDLE;
+			}
 		}
-	}
-	else
-	{
-		if (g_hAdvertTimer == INVALID_HANDLE)
+		else
 		{
 			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 		}
@@ -708,10 +707,7 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 	}
 	else
 	{
-		if (g_hAdvertTimer == INVALID_HANDLE)
-		{
-			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
-		}
+		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
 	}
 }
 
@@ -719,7 +715,10 @@ public OnAdvertFileChange(Handle:conVar, const String:oldValue[], const String:n
 {
 	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), newValue);
 	if (g_hAdvertisements != INVALID_HANDLE)
+	{
 		CloseHandle(g_hAdvertisements);
+		g_hAdvertisements = INVALID_HANDLE;
+	}
 	parseAdvertisements();
 }
 
@@ -727,7 +726,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
-		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128], String:noFlags[32];
+		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128];
 		new flagBits = -1,
 			noFlagBits = -1;
 		
@@ -735,23 +734,27 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[0],  sType,  sizeof(sType), "none");
 		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[1],  sText,  sizeof(sText), "none");
 		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[2], sFlags, sizeof(sFlags), "none");
-		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[3], noFlags, sizeof(noFlags), "none");
+		if (!StrEqual(sFlags, "none"))
+			flagBits = ReadFlagString(sFlags);
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[3], sFlags, sizeof(sFlags), "none");
+		if (!StrEqual(sFlags, "none"))
+			noFlagBits = ReadFlagString(sFlags);
 		
 		if (!KvGotoNextKey(g_hAdvertisements)) 
 		{
 			KvRewind(g_hAdvertisements);
 			KvGotoFirstSubKey(g_hAdvertisements);
 		}
-		
-		if (!StrEqual(sFlags, "none"))
-			flagBits = ReadFlagString(sFlags);
-		
-		if (!StrEqual(noFlags, "none"))
-			noFlagBits = ReadFlagString(noFlags);
-		
-		
+			
 		new Action:forwardReturn = Plugin_Continue,
 			bool:forwardBool = true;
+
+		if (StrContains(sText, "\\n") != -1)
+		{
+			Format(sFlags, sizeof(sFlags), "%c", 13);
+			ReplaceString(sText, sizeof(sText), "\\n", sBuffer);
+		}
+
 		Call_StartForward(g_hForwardPreReplace);
 		Call_PushString(sectionName);
 		Call_PushStringEx(sType, sizeof(sType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
