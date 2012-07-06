@@ -21,9 +21,9 @@
 #define PLUGIN_VERSION "1.2.5"
 
 #if defined ADVERT_TF2COLORS
-#define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-tf2.txt"
+#define UPDATE_URL "http://dl.dropbox.com/s/b4aj13fhv7sj41e/update-tf2.txt"
 #else
-#define UPDATE_URL "https://raw.github.com/minimoney1/SM-TF2-Advanced-Ads/master/update-nontf2.txt"
+#define UPDATE_URL "http://dl.dropbox.com/s/b4aj13fhv7sj41e/update-nontf2.txt"
 #endif
 
 new Handle:g_hPluginEnabled = INVALID_HANDLE;
@@ -31,7 +31,7 @@ new Handle:g_hAdvertDelay = INVALID_HANDLE;
 new Handle:g_hAdvertFile = INVALID_HANDLE;
 new Handle:g_hAdvertisements = INVALID_HANDLE;
 new Handle:g_hAdvertTimer = INVALID_HANDLE;
-//new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
+new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
 new Handle:g_hExitPanel = INVALID_HANDLE;
 new Handle:g_hExtraTopColorsPath = INVALID_HANDLE;
 #if defined ADVERT_TF2COLORS
@@ -103,10 +103,13 @@ static String:g_strConVarBoolText[2][5] =
 	"ON"
 };
 
-static String:g_strKeyValueKeyList[4][8] =
+static String:g_strKeyValueKeyList[7][8] =
 {
-	"type",
-	"text",
+	"say",
+	"top",
+	"center",
+	"menu",
+	"hint",
 	"flags",
 	"noflags"
 };
@@ -436,7 +439,7 @@ public OnPluginStart()
 	g_hForwardPreDeleteAdvert = CreateGlobalForward("OnPreDeleteAdvert", ET_Hook, Param_String, Param_Cell);
 	g_hForwardPostDeleteAdvert = CreateGlobalForward("OnPostDeleteAdvert", ET_Ignore, Param_String);
 	
-	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
+	g_hDynamicTagRegex = CompileRegex("/\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}/g", PCRE_UNGREEDY|PCRE_UTF8);
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
@@ -745,7 +748,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
-		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128];
+		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:sectionName[128], String:buffer2[256];
 		new flagBits = -1,
 			noFlagBits = -1;
 		
@@ -790,6 +793,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		if (StrContains(sType, "C", false) != -1) 
 		{
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
 				Call_StartForward(g_hForwardPreClientReplace);
@@ -799,15 +803,17 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
-				
+
+				strcopy(buffer2, sizeof(buffer2), sBuffer);
+
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
-					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
-					PrintCenterText(client, sBuffer);	
+					ReplaceClientText(client, buffer2, buffer2, sizeof(buffer2));
+					PrintCenterText(client, buffer2);	
 					new Handle:hCenterAd;
 					g_hCenterAd[client] = CreateDataTimer(1.0, Timer_CenterAd, hCenterAd, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
 					WritePackCell(hCenterAd,   client);
-					WritePackString(hCenterAd, sBuffer);
+					WritePackString(hCenterAd, buffer2);
 					
 				}
 			}
@@ -828,10 +834,12 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
+				strcopy(buffer2, sizeof(buffer2), sBuffer);
+
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
-					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
-					PrintHintText(client, sBuffer);
+					ReplaceClientText(client, buffer2, buffer2, sizeof(buffer2));
+					PrintHintText(client, buffer2);
 				}
 			}
 		}
@@ -841,8 +849,6 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		if (StrContains(sType, "M", false) != -1) 
 		{
 			new Handle:hPl = CreatePanel();
-			DrawPanelText(hPl, sBuffer);
-			SetPanelCurrentKey(hPl, 10);
 			
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
@@ -855,9 +861,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
+				strcopy(buffer2, sizeof(buffer2), sBuffer);
+
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
-					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
+					DrawPanelText(hPl, buffer2);
+					SetPanelCurrentKey(hPl, 10);
+					ReplaceClientText(client, buffer2, buffer2, sizeof(buffer2));
 					SendPanelToClient(hPl, client, Handler_DoNothing, 10);
 				}
 			}
@@ -880,10 +890,12 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 
+				strcopy(buffer2, sizeof(buffer2), sBuffer);
+
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
-					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
-					CPrintToChatEx(client, client, sBuffer);
+					ReplaceClientText(client, buffer2, buffer2, sizeof(buffer2));
+					CPrintToChatEx(client, client, buffer2);
 				}
 			}
 		}
@@ -931,10 +943,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			
-			new Handle:hKv = CreateKeyValues("Stuff", "title", sBuffer);
-			KvSetColor(hKv, "color", value[0], value[1], value[2], value[3]);
-			KvSetNum(hKv,   "level", 1);
-			KvSetNum(hKv,   "time",  10);
+			new Handle:hKv;
 			
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
@@ -946,13 +955,21 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushCellRef(flagBits);
 				Call_Finish(_:forwardBool);
 				
+				strcopy(buffer2, sizeof(buffer2), sBuffer);
+
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
-					ReplaceClientText(client, sBuffer, sBuffer, sizeof(sBuffer));
+					hKv = CreateKeyValues("Stuff", "title", buffer2);
+					KvSetColor(hKv, "color", value[0], value[1], value[2], value[3]);
+					KvSetNum(hKv,   "level", 1);
+					KvSetNum(hKv,   "time",  10);
+
+					ReplaceClientText(client, buffer2, buffer2, sizeof(buffer2));
 					CreateDialog(client, hKv, DialogType_Msg);
+					strcopy(buffer2, sizeof(buffer2), sBuffer);
 				}
+				CloseHandle(hKv);
 			}
-			CloseHandle(hKv);
 		}
 		Call_StartForward(g_hForwardPostAdvert);
 		Call_PushString(sectionName);
@@ -1039,10 +1056,7 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		if (client == 0)
-			PrintToServer("[SM] %The advertisement config has been reloaded!");
-		else
-			CPrintToChat(client, "%T %T", "Advert_Tag", "Config_Reloaded");
+		ReplyToCommand(client, "%T %T", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
@@ -1089,100 +1103,46 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 {
 	strcopy(outputText, outputText_maxLength, inputText);
 	decl String:part[256], String:replace[128];
-	new first, last;
-	new index = 0, charIndex;
 	new Handle:conVarFound;
-	for (new i = 0; i < 100; i++) 
+
+	new list;
+
+	if ((list = MatchRegex(g_hDynamicTagRegex, outputText)) > 0)
 	{
-		first = FindCharInString(outputText[index], '{');
-		last = FindCharInString(outputText[index], '}');
-		if (first != -1 || last != -1)
+		for (new i = 0; i <= list; i++)
 		{
-			for (new j = 0; j <= last - first + 1; j++) 
+			GetRegexSubString(g_hDynamicTagRegex, i, part, sizeof(part));
+			strcopy(replace, sizeof(replace), part);
+			if (StrContains(replace, "CONVAR_BOOL", false) != -1)
 			{
-				if (j == last - first + 1) 
-				{
-					part[j] = 0;
-					break;
-				}
-				part[j] = outputText[index + first + j];
-			}
-			index += last + 1;
-			
-			charIndex = StrContains(part, "{CONVAR:", false);
-			if (charIndex == 0)
-			{
-				strcopy(replace, sizeof(replace), part);
-				ReplaceString(replace, sizeof(replace), "{CONVAR:", "", false);
-				ReplaceString(replace, sizeof(replace), "}", "", false);
+				ReplaceStringEx(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
+				ReplaceStringEx(replace, sizeof(replace), "}", "", false);
 				conVarFound = FindConVar(replace);
 				if (conVarFound != INVALID_HANDLE)
 				{
-					GetConVarString(conVarFound, replace, sizeof(replace));
-					ReplaceString(outputText, outputText_maxLength, part, replace, false);
+					new conVarValue = GetConVarInt(conVarFound);
+					if (conVarValue == 0 || conVarValue == 1)
+						strcopy(replace, sizeof(replace), g_strConVarBoolText[conVarValue]);
+					else
+						replace = "";
 				}
 				else
-					ReplaceString(outputText, outputText_maxLength, part, "", false);
+					replace = "";
 			}
 			else
 			{
-				charIndex = StrContains(part, "{CONVAR_BOOL:", false);
-				if (charIndex == 0)
-				{
-					strcopy(replace, sizeof(replace), part);
-					ReplaceString(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
-					ReplaceString(replace, sizeof(replace), "}", "", false);
-					conVarFound = FindConVar(replace);
-					if (conVarFound != INVALID_HANDLE)
-					{
-						new int = GetConVarInt(conVarFound);
-						if (int == 1 || int == 0)
-							ReplaceString(outputText, outputText_maxLength, part, g_strConVarBoolText[int], false);
-						else
-							ReplaceString(outputText, outputText_maxLength, part, "", false);
-					}
-					else
-						ReplaceString(outputText, outputText_maxLength, part, "", false);
-				}
-			}
-			
-			/*if (MatchRegex(g_hDynamicTagRegex, part) > 0)
-			{
-				strcopy(replace, sizeof(replace), part);
-				new Handle:conVarFound = INVALID_HANDLE;
-				if (StrContains(replace, "CONVAR_BOOL", false) != -1)
-				{
-					ReplaceString(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
-					ReplaceString(replace, sizeof(replace), "}", "", false);
-					conVarFound = FindConVar(replace);
-					if (conVarFound != INVALID_HANDLE)
-					{
-						new conVarValue = GetConVarInt(conVarFound);
-						if (conVarValue == 0 || conVarValue == 1)
-							strcopy(replace, sizeof(replace), g_strConVarBoolText[conVarValue]);
-						else
-							replace = "";
-					}
-					else
-						replace = "";
-				}
+				ReplaceStringEx(replace, sizeof(replace), "{CONVAR:", "", false);
+				ReplaceStringEx(replace, sizeof(replace), "}", "", false);
+				conVarFound = FindConVar(replace);
+				if (conVarFound != INVALID_HANDLE)
+					GetConVarString(conVarFound, replace, sizeof(replace));
 				else
-				{
-					ReplaceString(replace, sizeof(replace), "{CONVAR:", "", false);
-					ReplaceString(replace, sizeof(replace), "}", "", false);
-					conVarFound = FindConVar(replace);
-					if (conVarFound != INVALID_HANDLE)
-						GetConVarString(conVarFound, replace, sizeof(replace));
-					else
-						replace = "";
-				}
-				ReplaceString(outputText, outputText_maxLength, part, replace);
-			}*/
+					replace = "";
+			}
+			ReplaceString(outputText, outputText_maxLength, part, replace);
 		}
-		else
-			break;
 	}
-	
+
 	new i = 1;
 	decl String:strTemp[256];
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
@@ -1265,9 +1225,7 @@ stock ReplaceClientText(client, const String:inputText[], String:outputText[], o
 		decl String:strTemp[256];
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
-			//GetClientName(client, strTemp, sizeof(strTemp));
-			// Workaround for names not showing (?)
-			GetClientInfo(client, "name", strTemp, sizeof(strTemp));
+			GetClientName(client, strTemp, sizeof(strTemp));
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
