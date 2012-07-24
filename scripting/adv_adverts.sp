@@ -21,9 +21,9 @@
 #define PLUGIN_VERSION "1.2.6"
 
 #if defined ADVERT_TF2COLORS
-#define UPDATE_URL "https://dl.dropbox.com/u/83581539/update-tf2.txt"
+#define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-tf2.txt"
 #else
-#define UPDATE_URL "https://dl.dropbox.com/u/83581539/update-nontf2.txt"
+#define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-nontf2.txt"
 #endif
 
 new Handle:g_hPluginEnabled = INVALID_HANDLE;
