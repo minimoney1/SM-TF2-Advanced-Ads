@@ -2,20 +2,13 @@
 	#endinput
 #endif
 
-public SharedPlugin:__pl_adv_adverts = 
-{
-	name = "adv_adverts",
-#if defined ADVERT_TF2COLORS
-	file = "adv_adverts_tf2.smx",
-#else
-	file = "adv_adverts_nontf2.smx",
-#endif
-#if defined REQUIRE_PLUGIN
-	required = 1,
-#else
-	required = 0,
-#endif
-};
+#define MAX_ADVERT_TEXT 5
+
+#define ADVERT_TEXT_SAY 0
+#define ADVERT_TEXT_CENTER 1
+#define ADVERT_TEXT_HINT 2
+#define ADVERT_TEXT_TOP 3
+#define ADVERT_TEXT_MENU 4
 
 /**
  * 
@@ -98,7 +91,6 @@ native bool:ShowAdvert(const String:advertId[] = NULL_STRING, bool:jumpTo = fals
  * Adds an advertisement to the advertisements list
  * 
  * @param advertId		The ID of the advertisement (As a string, does not need to be numerical)
- * @param advertType	The string that contains the letters for the type of the advertisement
  * @param advertText	The unedited string (with tags) of the advertisement
  * @param advertFlags	The bitwise representation of the admin flags that a client should have to view the ad.
  * @param noFlags		The bitwise representations of the admin flags that a client should not have to view the ad.
@@ -109,7 +101,7 @@ native bool:ShowAdvert(const String:advertId[] = NULL_STRING, bool:jumpTo = fals
  * 
  */
 
-native bool:AddAdvert(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags = -1, noFlags = -1, bool:jumpTo = false, bool:replace = false);
+native bool:AddAdvert(const String:advertId[], const String:advertText[][MAX_ADVERT_TEXT], advertFlags = -1, noFlags = -1, bool:jumpTo = false, bool:replace = false);
 
 /**
  * 
@@ -163,7 +155,6 @@ native bool:AddExtraChatColor(String:colorName[], hex);
  * Called before replacing the advert tags (The tags inside of '{' and '}' braces.
  * 
  * @param advertId		The id of the advertisement as specified in the config
- * @param advertType	The string containing the advertisement type(s) as specified in the config. (By-Ref)
  * @param advertText	The text string of the advertisement including all the tags inside of '{' and '}' braces. (By-Ref)
  * @param advertFlags	The flag bits that a client needs to have to view this advertisement. (By-Ref)
  * 
@@ -173,7 +164,7 @@ native bool:AddExtraChatColor(String:colorName[], hex);
  * @return				Plugin_Continue to allow the advert go through. Anything else would stop the advert from showing.
  * 
  */
-forward Action:OnAdvertPreReplace(const String:advertId[], String:advertType[], String:advertText[], &advertFlags);
+forward Action:OnAdvertPreReplace(const String:advertId[], String:advertText[][MAX_ADVERT_TEXT], &advertFlags);
 
 /**
  * 
@@ -191,7 +182,7 @@ forward Action:OnAdvertPreReplace(const String:advertId[], String:advertType[], 
  * 
  */
 
-forward bool:OnAdvertPreClientReplace(client, const String:advertId[], const String:advertType, String:advertText, &advertFlags);
+forward bool:OnAdvertPreClientReplace(client, const String:advertId[], String:advertText[][MAX_ADVERT_TEXT], &advertFlags);
 
 /**
  * 
@@ -338,6 +329,22 @@ forward Action:OnPreDeleteAdvert(String:advertId[], maxlength);
  */
 
 forward OnPostDeleteAdvert(const String:advertId[]);
+
+
+public SharedPlugin:__pl_adv_adverts = 
+{
+	name = "adv_adverts",
+#if defined ADVERT_TF2COLORS
+	file = "adv_adverts_tf2.smx",
+#else
+	file = "adv_adverts_nontf2.smx",
+#endif
+#if defined REQUIRE_PLUGIN
+	required = 1,
+#else
+	required = 0,
+#endif
+};
 
 public __pl_adv_adverts_SetNTVOptional()
 {

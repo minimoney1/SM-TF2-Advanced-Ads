@@ -4,7 +4,7 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.2.4"
+			"Latest"	"1.2.5"
 		}
 		
 		"Notes"		"Fixed Many Bugs"
@@ -12,7 +12,7 @@
 	
 	"Files"
 	{
-		"Plugin"	"Path_SM/plugins/adv_adverts_nontf2.smx"
+		"Plugin"	"Path_SM/plugins/adv_adverts_tf2.smx"
 
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
 		"Source"	"Path_SM/scripting/include/extended_adverts.inc"

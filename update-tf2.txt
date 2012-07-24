@@ -4,7 +4,7 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.2.5"
+			"Latest"	"1.2.4"
 		}
 		
 		"Notes"		"Fixed Many Bugs"
