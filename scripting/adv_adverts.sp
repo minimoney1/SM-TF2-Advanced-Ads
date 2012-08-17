@@ -10,7 +10,7 @@
 #include <updater>
 #define REQUIRE_PLUGIN
 #if defined ADVERT_TF2COLORS
-#include <morecolors>
+#include <morecolors_ads>
 #else
 #include <colors>
 #endif
@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.6"
+#define PLUGIN_VERSION "1.2.7-fix"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-tf2.txt"
@@ -771,7 +771,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		if (StrContains(sText, "\\n") != -1)
 		{
 			Format(sFlags, sizeof(sFlags), "%c", 13);
-			ReplaceString(sText, sizeof(sText), "\\n", sBuffer);
+			ReplaceString(sText, sizeof(sText), "\\n", sFlags);
 		}
 
 		Call_StartForward(g_hForwardPreReplace);
@@ -1040,10 +1040,7 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		if (client == 0)
-			PrintToServer("[SM] %The advertisement config has been reloaded!");
-		else
-			CPrintToChat(client, "%T %T", "Advert_Tag", "Config_Reloaded");
+		ReplyToCommand(client, "%T %T", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
