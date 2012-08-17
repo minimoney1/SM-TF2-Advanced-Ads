@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.2.6"
+			"Latest"	"1.2.7"
 		}
 		
-		"Notes"		"Fixed Many Bugs"
+		"Notes"		"Fixed Bugs"
 	}
 	
 	"Files"
@@ -16,5 +16,6 @@
 
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
 		"Source"	"Path_SM/scripting/include/extended_adverts.inc"
+		"Source"	"Path_SM/scripting/include/morecolors_ads.inc"
 	}
 }
