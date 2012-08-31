@@ -5,7 +5,7 @@
 public SharedPlugin:__pl_adv_adverts = 
 {
 	name = "adv_adverts",
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 	file = "adv_adverts_tf2.smx",
 #else
 	file = "adv_adverts_nontf2.smx",
@@ -41,7 +41,7 @@ native bool:AdvertExists(const String:advertId[]);
 
 native bool:DeleteAdvert(const String:advertId[]);
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 
 /**
  * 
@@ -142,7 +142,7 @@ native bool:AddExtraTopColor(String:colorName[], red, green, blue, alpha, bool:r
  */
 native bool:Client_CanViewAds(client, flagBits = -1, noFlagBits = -1);
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 /**
  * 
  * Adds a color to the extra chat colors trie.
@@ -209,7 +209,7 @@ forward bool:OnAdvertPreClientReplace(client, const String:advertId[], const Str
  */
 forward OnPostAdvertisementShown(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags);
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 /**
  * 
  * Called right before an extra chat color is added.
@@ -347,7 +347,7 @@ public __pl_adv_adverts_SetNTVOptional()
 	MarkNativeAsOptional("ReloadAdverts");
 	MarkNativeAsOptional("ShowAdvert");
 	MarkNativeAsOptional("AddAdvert");
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 	MarkNativeAsOptional("AddExtraChatColor");
 #endif
 }
