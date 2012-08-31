@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.7-fix"
+#define PLUGIN_VERSION "1.2.8"
 
 #if defined ADVERT_TF2COLORS
 #define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-tf2.txt"
@@ -27,11 +27,12 @@
 #endif
 
 new Handle:g_hPluginEnabled = INVALID_HANDLE;
+new Handle:g_hRootAccess = INVALID_HANDLE;
 new Handle:g_hAdvertDelay = INVALID_HANDLE;
 new Handle:g_hAdvertFile = INVALID_HANDLE;
 new Handle:g_hAdvertisements = INVALID_HANDLE;
 new Handle:g_hAdvertTimer = INVALID_HANDLE;
-//new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
+new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
 new Handle:g_hExitPanel = INVALID_HANDLE;
 new Handle:g_hExtraTopColorsPath = INVALID_HANDLE;
 #if defined ADVERT_TF2COLORS
@@ -59,7 +60,8 @@ new	Handle:g_hForwardPreAddTopColor,
 
 new bool:g_bPluginEnabled,
 	bool:g_bExitPanel,
-	bool:g_bUseSteamTools;
+	bool:g_bUseSteamTools,
+	bool:g_bRootAccess;
 
 new Float:g_fAdvertDelay;
 
@@ -71,7 +73,7 @@ new Float:g_fTime;
 new String:g_strConfigPath[PLATFORM_MAX_PATH];
 new String:g_strExtraTopColorsPath[PLATFORM_MAX_PATH];
 
-static String:g_tagRawText[11][24] = 
+static const String:g_tagRawText[11][24] = 
 {
 	"",
 	"{IP}",
@@ -86,7 +88,7 @@ static String:g_tagRawText[11][24] =
 	"{TIMELEFT}"
 };
 
-static String:g_clientRawText[7][32] =
+static const String:g_clientRawText[7][32] =
 {
 	"",
 	"{CLIENT_NAME}",
@@ -97,13 +99,13 @@ static String:g_clientRawText[7][32] =
 	"{CLIENT_MAPTIME}"
 };
 
-static String:g_strConVarBoolText[2][5] =
+static const String:g_strConVarBoolText[2][5] =
 {
 	"OFF",
 	"ON"
 };
 
-static String:g_strKeyValueKeyList[4][8] =
+static const String:g_strKeyValueKeyList[4][8] =
 {
 	"type",
 	"text",
@@ -398,6 +400,7 @@ public OnPluginStart()
 	#if defined ADVERT_TF2COLORS
 	g_hExtraChatColorsPath = CreateConVar("sm_extended_advertisements_extrachatcolors_file", "configs/extra_chat_colors.txt", "What is the directory of the \"Extra Chat Colors\" config?");
 	#endif
+	g_hRootAccess = CreateConVar("sm_extended_advertisements_root_access", "0", "Will ROOT admins always see all ads?", 0, true, 0.0, true, 1.0);
 	
 	HookConVarChange(g_hPluginEnabled, OnEnableChange);
 	HookConVarChange(g_hAdvertDelay, OnAdvertDelayChange);
@@ -407,6 +410,7 @@ public OnPluginStart()
 	#if defined ADVERT_TF2COLORS
 	HookConVarChange(g_hExtraChatColorsPath, OnExtraChatColorsPathChange);
 	#endif
+	HookConVarChange(g_hRootAccess, OnRootAccessChange);
 	
 	InitiConfiguration();
 
@@ -422,9 +426,9 @@ public OnPluginStart()
 	
 	AutoExecConfig();
 	
-	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
-	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
-	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
+	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
+	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell);
+	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
 #if defined ADVERT_TF2COLORS	
 	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef);
 	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore, Param_String, Param_Cell);
@@ -436,7 +440,7 @@ public OnPluginStart()
 	g_hForwardPreDeleteAdvert = CreateGlobalForward("OnPreDeleteAdvert", ET_Hook, Param_String, Param_Cell);
 	g_hForwardPostDeleteAdvert = CreateGlobalForward("OnPostDeleteAdvert", ET_Ignore, Param_String);
 	
-	//g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):[A-Za-z0-9_!@#$%^&*()\\-~`+=]{1,}\\}");
+	g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):([A-Za-z0-9_!@#$%^&*()\\-~`+=]+\\})", PCRE_CASELESS|PCRE_UNGREEDY);
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
@@ -460,16 +464,16 @@ public Action:Command_DeleteAdvert(client, args)
 {
 	if (args < 1)
 	{
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Usage");
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Del_Usage");
 		return Plugin_Handled;
 	}
 	decl String:arg[256];
 	GetCmdArgString(arg, sizeof(arg));
 	StripQuotes(arg);
 	if (DeleteAdvert(arg))
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Success", arg);
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Del_Success", arg);
 	else
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Fail", arg);
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Del_Fail", arg);
 	return Plugin_Handled;
 }
 
@@ -481,46 +485,46 @@ public Action:Command_AddAdvert(client, args)
 	{
 		case 5:
 		{
-			for (new i = 0; i <= args; i++)
+			for (new i = 1; i <= args; i++)
 			{
-				GetCmdArg(i, arg[i], sizeof(arg[]));
+				GetCmdArg(i, arg[i-1], sizeof(arg[]));
 			}
 			new flagBits = ReadFlagString(arg[3]),
 				noFlagBits = ReadFlagString(arg[4]);
 			
 			if (AddAdvert(arg[0], arg[1], arg[2], flagBits, noFlagBits))
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
 			else
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		case 4:
 		{
-			for (new i = 0; i <= args; i++)
+			for (new i = 1; i <= args; i++)
 			{
-				GetCmdArg(i, arg[i], sizeof(arg[]));
+				GetCmdArg(i, arg[i-1], sizeof(arg[]));
 			}
 			new flagBits = ReadFlagString(arg[3]);
 			
 			if (AddAdvert(arg[0], arg[1], arg[2], flagBits))
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
 			else
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		case 3:
 		{
-			for (new i = 0; i <= args; i++)
+			for (new i = 1; i <= args; i++)
 			{
-				GetCmdArg(i, arg[i], sizeof(arg[]));
+				GetCmdArg(i, arg[i-1], sizeof(arg[]));
 			}
 			
 			if (AddAdvert(arg[0], arg[1], arg[2]))
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
 			else
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		default:
 		{
-			ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Usage");
+			ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Usage");
 			return Plugin_Handled;
 		}
 	}
@@ -645,7 +649,8 @@ stock InitiConfiguration()
 	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
 	g_fAdvertDelay = GetConVarFloat(g_hAdvertDelay);
 	g_bExitPanel = GetConVarBool(g_hExitPanel);
-	
+	g_bRootAccess = GetConVarBool(g_hRootAccess);
+
 	decl String:advertPath[PLATFORM_MAX_PATH];
 	GetConVarString(g_hAdvertFile, advertPath, sizeof(advertPath));
 	BuildPath(Path_SM, g_strConfigPath, sizeof(g_strConfigPath), advertPath);
@@ -658,6 +663,11 @@ stock InitiConfiguration()
 	BuildPath(Path_SM, g_strExtraChatColorsPath, sizeof(g_strExtraChatColorsPath), advertPath);
 	#endif
 	initTopColorTrie();
+}
+
+public OnRootAccessChange(Handle:conVar, const String:oldValue[], const String:newValue[])
+{
+	g_bRootAccess = StringToInt(newValue) ? true : false;
 }
 
 public OnExtraTopColorsPathChange(Handle:conVar, const String:oldValue[], const String:newValue[])
@@ -779,6 +789,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		Call_PushStringEx(sType, sizeof(sType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 		Call_PushStringEx(sText, sizeof(sText), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 		Call_PushCellRef(flagBits);
+		Call_PushCellRef(noFlagBits);
 		Call_Finish(_:forwardReturn);
 		
 		if (forwardReturn != Plugin_Continue)
@@ -798,6 +809,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
+				Call_PushCellRef(noFlagBits);
 				Call_Finish(_:forwardBool);
 				
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
@@ -826,6 +838,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
+				Call_PushCellRef(noFlagBits);
 				Call_Finish(_:forwardBool);
 				
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
@@ -853,6 +866,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
+				Call_PushCellRef(noFlagBits);
 				Call_Finish(_:forwardBool);
 				
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
@@ -878,6 +892,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
+				Call_PushCellRef(noFlagBits);
 				Call_Finish(_:forwardBool);
 
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
@@ -940,6 +955,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
+				Call_PushCellRef(noFlagBits);
 				Call_Finish(_:forwardBool);
 				
 				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
@@ -960,6 +976,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		Call_PushString(sType);
 		Call_PushString(sText);
 		Call_PushCell(flagBits);
+		Call_PushCell(noFlagBits);
 		Call_Finish();
 	}
 	return Plugin_Continue;
@@ -1017,7 +1034,7 @@ public Action:Command_ShowAd(client, args)
 		StripQuotes(arg);
 		if (!ShowAdvert(arg))
 		{
-			ReplyToCommand(client, "%T %T", "Advert_Tag", "ShowAd_NotFound");
+			ReplyToCommand(client, "%t %t", "Advert_Tag", "ShowAd_NotFound");
 			return Plugin_Handled;
 		}
 	}
@@ -1040,7 +1057,7 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Config_Reloaded");
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
@@ -1087,95 +1104,41 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 {
 	strcopy(outputText, outputText_maxLength, inputText);
 	decl String:part[256], String:replace[128];
-	new first, last;
-	new index = 0, charIndex;
-	new Handle:conVarFound;
 	for (new i = 0; i < 100; i++) 
 	{
-		first = FindCharInString(outputText[index], '{');
-		last = FindCharInString(outputText[index], '}');
-		if (first != -1 || last != -1)
+		if (FindCharInString(outputText, '{') != -1 || FindCharInString(outputText, '}') != -1)
 		{
-			for (new j = 0; j <= last - first + 1; j++) 
+			if (MatchRegex(g_hDynamicTagRegex, part) > 0)
 			{
-				if (j == last - first + 1) 
+				GetRegexSubString(g_hDynamicTagRegex, 0, replace, sizeof(replace));
+				if (!StrContains(replace, "{CONVAR_BOOL:", false))
 				{
-					part[j] = 0;
-					break;
-				}
-				part[j] = outputText[index + first + j];
-			}
-			index += last + 1;
-			
-			charIndex = StrContains(part, "{CONVAR:", false);
-			if (charIndex == 0)
-			{
-				strcopy(replace, sizeof(replace), part);
-				ReplaceString(replace, sizeof(replace), "{CONVAR:", "", false);
-				ReplaceString(replace, sizeof(replace), "}", "", false);
-				conVarFound = FindConVar(replace);
-				if (conVarFound != INVALID_HANDLE)
-				{
-					GetConVarString(conVarFound, replace, sizeof(replace));
-					ReplaceString(outputText, outputText_maxLength, part, replace, false);
-				}
-				else
-					ReplaceString(outputText, outputText_maxLength, part, "", false);
-			}
-			else
-			{
-				charIndex = StrContains(part, "{CONVAR_BOOL:", false);
-				if (charIndex == 0)
-				{
-					strcopy(replace, sizeof(replace), part);
-					ReplaceString(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
-					ReplaceString(replace, sizeof(replace), "}", "", false);
-					conVarFound = FindConVar(replace);
-					if (conVarFound != INVALID_HANDLE)
-					{
-						new int = GetConVarInt(conVarFound);
-						if (int == 1 || int == 0)
-							ReplaceString(outputText, outputText_maxLength, part, g_strConVarBoolText[int], false);
-						else
-							ReplaceString(outputText, outputText_maxLength, part, "", false);
-					}
-					else
-						ReplaceString(outputText, outputText_maxLength, part, "", false);
-				}
-			}
-			
-			/*if (MatchRegex(g_hDynamicTagRegex, part) > 0)
-			{
-				strcopy(replace, sizeof(replace), part);
-				new Handle:conVarFound = INVALID_HANDLE;
-				if (StrContains(replace, "CONVAR_BOOL", false) != -1)
-				{
-					ReplaceString(replace, sizeof(replace), "{CONVAR_BOOL:", "", false);
-					ReplaceString(replace, sizeof(replace), "}", "", false);
-					conVarFound = FindConVar(replace);
+					replace[FindCharInString(replace, '}')] = '\0';
+					new Handle:conVarFound = FindConVar(replace[14]);
 					if (conVarFound != INVALID_HANDLE)
 					{
 						new conVarValue = GetConVarInt(conVarFound);
 						if (conVarValue == 0 || conVarValue == 1)
 							strcopy(replace, sizeof(replace), g_strConVarBoolText[conVarValue]);
 						else
-							replace = "";
+							replace[0] = '\0';
 					}
 					else
-						replace = "";
+						replace[0] = '\0';
 				}
-				else
+				else if (!StrContains(replace, "{CONVAR:", false))
 				{
-					ReplaceString(replace, sizeof(replace), "{CONVAR:", "", false);
-					ReplaceString(replace, sizeof(replace), "}", "", false);
-					conVarFound = FindConVar(replace);
+					replace[FindCharInString(replace, '}')] = '\0';
+					new Handle:conVarFound = FindConVar(replace[9]);
 					if (conVarFound != INVALID_HANDLE)
 						GetConVarString(conVarFound, replace, sizeof(replace));
 					else
-						replace = "";
+						replace[0] = '\0';
 				}
 				ReplaceString(outputText, outputText_maxLength, part, replace);
-			}*/
+			}
+			else
+				break;
 		}
 		else
 			break;
@@ -1318,7 +1281,7 @@ public Native_CanViewAdvert(Handle:plugin, numParams)
 	new noFlagBits = GetNativeCell(3);
 	if (clientFlagBits == -1 && noFlagBits == -1)
 		return true;
-	if (CheckCommandAccess(client, "extended_adverts", ADMFLAG_ROOT))
+	if (g_bRootAccess && CheckCommandAccess(client, "extended_advert_root", ADMFLAG_ROOT))
 		return true;
 	if ((clientFlagBits == -1 || CheckCommandAccess(client, "extended_advert", clientFlagBits)) && (noFlagBits == -1 || !CheckCommandAccess(client, "extended_notview", noFlagBits)))
 		return true;
