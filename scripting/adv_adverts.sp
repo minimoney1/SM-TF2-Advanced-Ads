@@ -56,6 +56,7 @@ new	Handle:g_hForwardPreAddTopColor,
 	Handle:g_hForwardPreAddAdvert,
 	Handle:g_hForwardPostAddAdvert,
 	Handle:g_hForwardPreDeleteAdvert,
+	Handle:g_hForwardOnLoadedPost,
 	Handle:g_hForwardPostDeleteAdvert;
 
 new bool:g_bPluginEnabled,
@@ -117,7 +118,7 @@ public Plugin:myinfo =
 {
 	name        = "Extended Advertisements",
 	author      = "Mini",
-	description = "Extended advertisement system for TF2's new color abilities for developers",
+	description = "Extended advertisement system for Source 2009 games' new color abilities for developers",
 	version     = PLUGIN_VERSION,
 	url         = "http://forums.alliedmods.net/"
 };
@@ -143,10 +144,8 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 
 public Native_AdvertExists(Handle:plugin, numParams)
 {
-	new ml;
-	GetNativeStringLength(1, ml);
-	decl String:id[ml];
-	GetNativeString(1, id, ml);
+	decl String:id[32];
+	GetNativeString(1, id, sizeof(id));
 	KvSavePosition(g_hAdvertisements);
 	if (KvJumpToKey(g_hAdvertisements, id))
 	{
@@ -158,23 +157,22 @@ public Native_AdvertExists(Handle:plugin, numParams)
 
 public Native_DeleteAdvert(Handle:plugin, numParams)
 {
-	new ml;
-	GetNativeStringLength(1, ml);
-	decl String:id[ml];
-	GetNativeString(1, id, ml);
+	decl String:id[32];
+	GetNativeString(1, id, sizeof(id));
 	
 	new Action:returnVal = Plugin_Continue;
 	Call_StartForward(g_hForwardPreDeleteAdvert);
-	Call_PushStringEx(id, ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-	Call_PushCell(ml);
+	Call_PushStringEx(id, sizeof(id), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(id));
 	Call_Finish(_:returnVal);
 	
-	if (returnVal != Plugin_Continue)
+	if (returnVal == Plugin_Handled || returnVal == Plugin_Stop)
 		return false;
 	
 	KvSavePosition(g_hAdvertisements);
 	if (KvJumpToKey(g_hAdvertisements, id))
 	{
+		KvGotoFirstSubKey(g_hAdvertisements);
 		KvDeleteThis(g_hAdvertisements);
 		KvRewind(g_hAdvertisements);
 		Call_StartForward(g_hForwardPostDeleteAdvert);
@@ -214,10 +212,8 @@ public Native_ReloadAds(Handle:plugin, numParams)
 
 public Native_ShowAdvert(Handle:plugin, numParams)
 {
-	new maxlength;
-	GetNativeStringLength(1, maxlength);
-	decl String:advertId[maxlength];
-	GetNativeString(1, advertId, maxlength);
+	decl String:advertId[32];
+	GetNativeString(1, advertId, sizeof(advertId));
 	new bool:order = GetNativeCell(2);
 	if (order)
 		KvSavePosition(g_hAdvertisements);
@@ -234,84 +230,111 @@ public Native_ShowAdvert(Handle:plugin, numParams)
 
 public Native_AddAdvert(Handle:plugin, numParams)
 {
-	new advertId_ml;
-	GetNativeStringLength(1, advertId_ml);
-	decl String:advertId[advertId_ml];
-	GetNativeString(1, advertId, advertId_ml);
-	new advertText_ml, advertType_ml;
-	GetNativeStringLength(3, advertText_ml);
-	GetNativeStringLength(2, advertType_ml);
-	decl String:advertText[advertText_ml], String:advertType[advertType_ml];
-	GetNativeString(3, advertText, advertText_ml);
-	GetNativeString(2, advertType, advertType_ml);
-	new flagBits = GetNativeCell(4);
-	new noFlagBits = GetNativeCell(5);
+	decl String:advertId[32];
+	advertId[0] = '\0';
+	GetNativeString(1, advertId, sizeof(advertId));
+	if (!strcmp(advertId, "") || !strcmp(advertId, "none", false))
+	{
+		KvSavePosition(g_hAdvertisements);
+		KvGoBack(g_hAdvertisements);
+		KvGotoFirstSubKey(g_hAdvertisements);
+		while (KvGotoNextKey(g_hAdvertisements))
+		{
+			continue;
+		}
+		KvGetSectionName(g_hAdvertisements, advertId, sizeof(advertId));
+		new id = StringToInt(advertId);
+		FormatEx(advertId, sizeof(advertId), "%i", (id + 1));
+		KvRewind(g_hAdvertisements);
+	}
+	decl String:advertText[512], String:advertType[16];
+	advertText[0] = '\0';
+	advertType[0] = '\0';
+	GetNativeString(3, advertText, sizeof(advertText));
+	GetNativeString(2, advertType, sizeof(advertType));
+	decl String:flagBits[32];
+	decl String:noFlagBits[32];
+	flagBits[0] = '\0';
+	noFlagBits[0] = '\0';
+	GetNativeString(4, flagBits, sizeof(flagBits));
+	GetNativeString(5, noFlagBits, sizeof(noFlagBits));
 	new bool:jumpTo = GetNativeCell(6);
 	new bool:replace = GetNativeCell(7);
 	
 	new Action:returnVal = Plugin_Continue;
 	
 	Call_StartForward(g_hForwardPreAddAdvert);
-	Call_PushStringEx(advertId, advertId_ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-	Call_PushCell(advertId_ml);
-	Call_PushStringEx(advertType, advertType_ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-	Call_PushCell(advertType_ml);
-	Call_PushStringEx(advertText, advertText_ml, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-	Call_PushCell(advertText_ml);
-	Call_PushCellRef(flagBits);
-	Call_PushCellRef(noFlagBits);
+	Call_PushStringEx(advertId, sizeof(advertId), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(advertId));
+	Call_PushStringEx(advertType, sizeof(advertType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(advertType));
+	Call_PushStringEx(advertText, sizeof(advertType), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(advertText));
+	Call_PushStringEx(flagBits, sizeof(flagBits), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(flagBits));
+	Call_PushStringEx(noFlagBits, sizeof(noFlagBits), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(noFlagBits));
 	Call_PushCellRef(jumpTo);
 	Call_PushCellRef(replace);
 	Call_Finish(_:returnVal);
 	
-	if (returnVal != Plugin_Continue)
+	if (returnVal == Plugin_Handled || returnVal == Plugin_Stop)
 		return false;
 	
 	new bool:advertExists = AdvertExists(advertId);
 	
-	if (!jumpTo || (!replace && advertExists))
+	if (!replace && advertExists)
+	{
+		if (jumpTo)
+		{
+			KvJumpToKey(g_hAdvertisements, advertId);
+			KvGotoFirstSubKey(g_hAdvertisements);
+		}
+		return false;
+	}
+
+	if (!jumpTo)
 		KvSavePosition(g_hAdvertisements);
 	
 	if (replace && advertExists)
 	{
 		KvJumpToKey(g_hAdvertisements, advertId);
+		KvGotoFirstSubKey(g_hAdvertisements);
 		KvDeleteThis(g_hAdvertisements);
-	}
-	else if (!replace && advertExists)
-	{
-		KvRewind(g_hAdvertisements);
-		return false;
 	}
 	
 	KvJumpToKey(g_hAdvertisements, advertId, true);
-	
+	KvGotoFirstSubKey(g_hAdvertisements);
+
 	KvSetString(g_hAdvertisements, g_strKeyValueKeyList[0], advertType);
 	KvSetString(g_hAdvertisements, g_strKeyValueKeyList[1], advertText);
-	KvSetNum(g_hAdvertisements, g_strKeyValueKeyList[2], flagBits);
-	KvSetNum(g_hAdvertisements, g_strKeyValueKeyList[3], noFlagBits);
+	KvSetString(g_hAdvertisements, g_strKeyValueKeyList[2], flagBits);
+	KvSetString(g_hAdvertisements, g_strKeyValueKeyList[3], noFlagBits);
 	
 	if (!jumpTo)
 		KvRewind(g_hAdvertisements);
-	
+	else
+		KvGoBack(g_hAdvertisements);
+
 	Call_StartForward(g_hForwardPostAddAdvert);
 	Call_PushString(advertId);
 	Call_PushString(advertType);
 	Call_PushString(advertText);
-	Call_PushCell(flagBits);
-	Call_PushCell(noFlagBits);
+	Call_PushString(flagBits);
+	Call_PushString(noFlagBits);
 	Call_PushCell(jumpTo);
 	Call_PushCell(replace);
 	Call_Finish();
 	
+	SetNativeString(1, advertId, sizeof(advertId));
+
 	return true;
 }
 
 public Native_AddTopColorToTrie(Handle:plugin, numParams)
 {
-	new colorName_maxLength;
-	GetNativeStringLength(1, colorName_maxLength);
-	decl String:colorName[colorName_maxLength];
-	GetNativeString(1, colorName, colorName_maxLength);
+	decl String:colorName[64];
+	GetNativeString(1, colorName, sizeof(colorName));
 	new red = GetNativeCell(2),
 		blue = GetNativeCell(3),
 		green = GetNativeCell(4),
@@ -320,8 +343,8 @@ public Native_AddTopColorToTrie(Handle:plugin, numParams)
 	
 	new Action:fReturn = Plugin_Continue;
 	Call_StartForward(g_hForwardPreAddTopColor);
-	Call_PushStringEx(colorName, colorName_maxLength, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-	Call_PushCell(colorName_maxLength);
+	Call_PushStringEx(colorName, sizeof(colorName), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(colorName));
 	Call_PushCellRef(red);
 	Call_PushCellRef(green);
 	Call_PushCellRef(blue);
@@ -329,7 +352,7 @@ public Native_AddTopColorToTrie(Handle:plugin, numParams)
 	Call_PushCellRef(replace);
 	Call_Finish(_:fReturn);
 	
-	if (fReturn != Plugin_Continue)
+	if (fReturn == Plugin_Handled || fReturn == Plugin_Stop)
 	{
 		return false;
 	}
@@ -357,20 +380,18 @@ public Native_AddTopColorToTrie(Handle:plugin, numParams)
 #if defined ADVERT_SOURCE2009
 public Native_AddChatColorToTrie(Handle:plugin, numParams)
 {
-	new colorName_maxLength;
-	GetNativeStringLength(1, colorName_maxLength);
-	decl String:colorName[colorName_maxLength];
-	GetNativeString(1, colorName, colorName_maxLength);
+	decl String:colorName[32];
+	GetNativeString(1, colorName, sizeof(colorName));
 	new hex = GetNativeCell(2);
 	
 	new Action:callReturn = Plugin_Continue;
 	Call_StartForward(g_hForwardPreAddChatColor);
-	Call_PushStringEx(colorName, colorName_maxLength, SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-	Call_PushCell(colorName_maxLength);
+	Call_PushStringEx(colorName, sizeof(colorName), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+	Call_PushCell(sizeof(colorName));
 	Call_PushCellRef(hex);
 	Call_Finish(_:callReturn);
 	
-	if (callReturn != Plugin_Continue)
+	if (callReturn == Plugin_Handled || callReturn == Plugin_Stop)
 		return false;
 	
 	new bool:returnVal = CAddColor(colorName, hex);
@@ -412,9 +433,6 @@ public OnPluginStart()
 	#endif
 	HookConVarChange(g_hRootAccess, OnRootAccessChange);
 	
-	InitiConfiguration();
-
-	
 	LoadTranslations("extended_advertisements.phrases");
 	
 	
@@ -422,21 +440,24 @@ public OnPluginStart()
 	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_RCON);
 	RegAdminCmd("sm_addadvert", Command_AddAdvert, ADMFLAG_RCON);
 	RegAdminCmd("sm_deladd", Command_DeleteAdvert, ADMFLAG_RCON);
+	RegAdminCmd("sm_dumpads", Command_DumpAds, ADMFLAG_RCON);
 	
 	
 	AutoExecConfig();
 	
+	g_hForwardOnLoadedPost = CreateGlobalForward("OnAdvertsLoaded", ET_Ignore);
+
 	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell);
-	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
+	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Hook, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
 #if defined ADVERT_SOURCE2009	
 	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef);
 	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore, Param_String, Param_Cell);
 #endif
 	g_hForwardPreAddTopColor = CreateGlobalForward("OnAddTopColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
 	g_hForwardPostAddTopColor = CreateGlobalForward("OnAddTopColorPost", ET_Ignore, Param_String, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
-	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef);
-	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardPreAddAdvert = CreateGlobalForward("OnAddAdvertPre", ET_Hook, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_String, Param_Cell, Param_CellByRef, Param_CellByRef);
+	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore, Param_String, Param_String, Param_String, Param_String, Param_String, Param_Cell, Param_Cell);
 	g_hForwardPreDeleteAdvert = CreateGlobalForward("OnPreDeleteAdvert", ET_Hook, Param_String, Param_Cell);
 	g_hForwardPostDeleteAdvert = CreateGlobalForward("OnPostDeleteAdvert", ET_Ignore, Param_String);
 	
@@ -444,6 +465,15 @@ public OnPluginStart()
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
+	InitiConfiguration();
+	#if defined ADVERT_SOURCE2009
+	parseExtraChatColors();
+	#endif
+	parseExtraTopColors();
+	parseAdvertisements();
+	Call_StartForward(g_hForwardOnLoadedPost);
+	Call_Finish();
+
 	if (LibraryExists("updater"))
 		Updater_AddPlugin(UPDATE_URL);
 }
@@ -451,13 +481,23 @@ public OnPluginStart()
 #if defined ADVERT_SOURCE2009
 stock bool:IsGameCompatible()
 {
-	/*new sdkversion = GuessSDKVersion();
-	if (SOURCE_SDK_EPISODE2VALVE <= sdkversion < SOURCE_SDK_LEFT4DEAD || sdkversion >= SOURCE_SDK_CSGO)*/
-	if (SOURCE_SDK_EPISODE2VALVE <= GuessSDKVersion() < SOURCE_SDK_LEFT4DEAD)
+	decl String:name[32];
+	GetGameFolderName(name, sizeof(name));
+	if (!strcmp(name, "cstrike") || !strcmp(name, "tf") || !strcmp(name, "hl2mp") || !strcmp(name, "dod"))
 		return true;
 	return false;
 }
 #endif
+
+public Action:Command_DumpAds(client, args)
+{
+	decl String:file[256];
+	BuildPath(Path_SM, file, sizeof(file), "configs/dump_ads.txt");
+	OpenFile(file, "w");
+	KeyValuesToFile(g_hAdvertisements, file);
+	ReplyToCommand(client, "%t %t", "Advert_Tag", "Dumped_Ads");
+	return Plugin_Handled;
+}
 
 // [SM] Usage: sm_deladvert <Advert Id>
 public Action:Command_DeleteAdvert(client, args)
@@ -480,54 +520,24 @@ public Action:Command_DeleteAdvert(client, args)
 // [SM] Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]
 public Action:Command_AddAdvert(client, args)
 {
-	decl String:arg[5][256];
-	switch (args)
+	
+	if (args < 7)
 	{
-		case 5:
-		{
-			for (new i = 1; i <= args; i++)
-			{
-				GetCmdArg(i, arg[i-1], sizeof(arg[]));
-			}
-			new flagBits = ReadFlagString(arg[3]),
-				noFlagBits = ReadFlagString(arg[4]);
-			
-			if (AddAdvert(arg[0], arg[1], arg[2], flagBits, noFlagBits))
-				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
-			else
-				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
-		}
-		case 4:
-		{
-			for (new i = 1; i <= args; i++)
-			{
-				GetCmdArg(i, arg[i-1], sizeof(arg[]));
-			}
-			new flagBits = ReadFlagString(arg[3]);
-			
-			if (AddAdvert(arg[0], arg[1], arg[2], flagBits))
-				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
-			else
-				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
-		}
-		case 3:
-		{
-			for (new i = 1; i <= args; i++)
-			{
-				GetCmdArg(i, arg[i-1], sizeof(arg[]));
-			}
-			
-			if (AddAdvert(arg[0], arg[1], arg[2]))
-				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
-			else
-				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
-		}
-		default:
-		{
-			ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Usage");
-			return Plugin_Handled;
-		}
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Usage");
+		return Plugin_Handled;
 	}
+	decl String:arg[7][256];
+	for (new i = 0; i < args; i++)
+	{
+		GetCmdArg((i + 1), arg[i], sizeof(arg[]));
+		PrintToChatAll("Got %s", args[i]);
+	}
+	if (AddAdvert(arg[0], arg[1], arg[2], arg[3], arg[4], (StringToInt(arg[5]) ? true : false), (StringToInt(arg[6]) ? true : false)))
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
+	else
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
+
+	ReloadAdverts();
 	return Plugin_Handled;
 }
 
@@ -755,18 +765,18 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
-		decl String:sFlags[32], String:sText[256], String:sType[6], String:sBuffer[256], String:sBuffer2[256], String:sectionName[128];
+		decl String:sFlags[32], String:sText[512], String:sType[6], String:sBuffer[256], String:sBuffer2[256], String:sBuffer3[256], String:sectionName[128];
 		new flagBits = -1,
 			noFlagBits = -1;
 		
 		KvGetSectionName(g_hAdvertisements, sectionName, sizeof(sectionName));
-		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[0],  sType,  sizeof(sType), "none");
-		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[1],  sText,  sizeof(sText), "none");
-		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[2], sFlags, sizeof(sFlags), "none");
-		if (!StrEqual(sFlags, "none"))
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[0],  sType,  sizeof(sType), "");
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[1],  sText,  sizeof(sText), "");
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[2], sFlags, sizeof(sFlags), "");
+		if (!StrEqual(sFlags, ""))
 			flagBits = ReadFlagString(sFlags);
-		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[3], sFlags, sizeof(sFlags), "none");
-		if (!StrEqual(sFlags, "none"))
+		KvGetString(g_hAdvertisements, g_strKeyValueKeyList[3], sFlags, sizeof(sFlags), "");
+		if (!StrEqual(sFlags, ""))
 			noFlagBits = ReadFlagString(sFlags);
 		
 		if (!KvGotoNextKey(g_hAdvertisements)) 
@@ -775,8 +785,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			KvGotoFirstSubKey(g_hAdvertisements);
 		}
 			
-		new Action:forwardReturn = Plugin_Continue,
-			bool:forwardBool = true;
+		new Action:forwardReturn = Plugin_Continue;
 
 		if (StrContains(sText, "\\n") != -1)
 		{
@@ -792,7 +801,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		Call_PushCellRef(noFlagBits);
 		Call_Finish(_:forwardReturn);
 		
-		if (forwardReturn != Plugin_Continue)
+		if (forwardReturn == Plugin_Handled || forwardReturn == Plugin_Stop)
 			return Plugin_Continue;
 		
 		ReplaceAdText(sText, sText, sizeof(sText));
@@ -801,110 +810,128 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		if (StrContains(sType, "C", false) != -1) 
 		{
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
+				forwardReturn = Plugin_Continue;
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
+				Call_PushCell(advType_Center);
 				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_PushCellRef(noFlagBits);
-				Call_Finish(_:forwardBool);
+				Call_Finish(_:forwardReturn);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
+				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
 					PrintCenterText(client, sBuffer2);	
 					new Handle:hCenterAd;
 					g_hCenterAd[client] = CreateDataTimer(1.0, Timer_CenterAd, hCenterAd, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
-					WritePackCell(hCenterAd,   client);
+					WritePackCell(hCenterAd,   GetClientUserId(client));
 					WritePackString(hCenterAd, sBuffer2);
 					
 				}
+				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
 			}
 		}
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
-		forwardBool = true;
 		if (StrContains(sType, "H", false) != -1) 
 		{
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
+				forwardReturn = Plugin_Continue;
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
+				Call_PushCell(advType_Hint);
 				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_PushCellRef(noFlagBits);
-				Call_Finish(_:forwardBool);
+				Call_Finish(_:forwardReturn);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
+				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
 					PrintHintText(client, sBuffer2);
 				}
+				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
 			}
 		}
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
-		forwardBool = true;
 		if (StrContains(sType, "M", false) != -1) 
 		{
 			new Handle:hPl = CreatePanel();
 			DrawPanelText(hPl, sBuffer);
+			if (g_bExitPanel)
+			{
+				DrawPanelText(hPl, " \n \n \n");
+				DrawPanelItem(hPl, "Exit");
+			}
+
 			SetPanelCurrentKey(hPl, 10);
 			
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
+				forwardReturn = Plugin_Continue;
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
+				Call_PushCell(advType_Menu);
 				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_PushCellRef(noFlagBits);
-				Call_Finish(_:forwardBool);
+				Call_Finish(_:forwardReturn);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
+				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
 					SendPanelToClient(hPl, client, Handler_DoNothing, 10);
 				}
+				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
 			}
 			
 			CloseHandle(hPl);
 		}
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
-		forwardBool = true;
 		if (StrContains(sType, "S", false) != -1) 
 		{
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer), true);
+			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
+				forwardReturn = Plugin_Continue;
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
+				Call_PushCell(advType_Say);
 				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_PushCellRef(noFlagBits);
-				Call_Finish(_:forwardBool);
+				Call_Finish(_:forwardReturn);
 
-				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
+				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
 					CPrintToChatEx(client, client, sBuffer2);
 				}
+				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
 			}
 		}
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
-		forwardBool = true;
 		if (StrContains(sType, "T", false) != -1) 
 		{
 			// Credits go to Dr. Mckay
@@ -946,19 +973,21 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			
 			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
 			
-			
+			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
+				forwardReturn = Plugin_Continue;
 				Call_StartForward(g_hForwardPreClientReplace);
 				Call_PushCell(client);
+				Call_PushCell(advType_Top);
 				Call_PushString(sectionName);
 				Call_PushString(sType);
 				Call_PushStringEx(sBuffer, sizeof(sBuffer), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
 				Call_PushCellRef(flagBits);
 				Call_PushCellRef(noFlagBits);
-				Call_Finish(_:forwardBool);
+				Call_Finish(_:forwardReturn);
 				
-				if (forwardBool && Client_CanViewAds(client, flagBits, noFlagBits))
+				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					new Handle:hKv = CreateKeyValues("Stuff", "title", sBuffer2);
 					KvSetColor(hKv, "color", value[0], value[1], value[2], value[3]);
@@ -968,7 +997,8 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 					CreateDialog(client, hKv, DialogType_Msg);
 					if (hKv != INVALID_HANDLE)
 						CloseHandle(hKv);
-				}				
+				}
+				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);			
 			}
 		}
 		Call_StartForward(g_hForwardPostAdvert);
@@ -980,6 +1010,11 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		Call_Finish();
 	}
 	return Plugin_Continue;
+}
+
+stock IsPassedFwd(Action:returnVal)
+{
+	return ((returnVal == Plugin_Handled || returnVal == Plugin_Stop) ? false : true);
 }
 
 public Handler_DoNothing(Handle:menu, MenuAction:action, param1, param2) 
@@ -1006,7 +1041,9 @@ public Action:Timer_CenterAd(Handle:timer, Handle:pack)
 	static iCount = 0;
 	
 	ResetPack(pack);
-	new iClient = ReadPackCell(pack);
+	new iClient = GetClientOfUserId(ReadPackCell(pack));
+	if (iClient == -1)
+		return Plugin_Continue;
 	ReadPackString(pack, sText, sizeof(sText));
 	
 	if (IsClientInGame(iClient) && ++iCount < 5) 
@@ -1070,28 +1107,25 @@ stock parseAdvertisements()
 		
 		if (FileExists(g_strConfigPath)) 
 		{
-			//new Handle:kv = CreateKeyValues("Advertisements");
-			FileToKeyValues(g_hAdvertisements, g_strConfigPath);
-			/*KvGotoFirstSubKey(kv);
+			new Handle:kv = CreateKeyValues("Advertisements");
+			FileToKeyValues(kv, g_strConfigPath);
+			KvGotoFirstSubKey(kv);
 			decl String:sBuffer[5][256];
 			do
 			{
 				KvGetSectionName(kv, sBuffer[4], sizeof(sBuffer[]));
 				for (new i = 0; i < sizeof(g_strKeyValueKeyList); i++)
 				{
-					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer[i], sizeof(sBuffer[]), "none");
+					sBuffer[i][0] = '\0';
+					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer[i], sizeof(sBuffer[]), "");
 				}
-				new flags = -1, noflags = -1;
-				
-				if (!StrEqual(sBuffer[2], "none"))
-					flags = ReadFlagString(sBuffer[2]);
-				if (!StrEqual(sBuffer[3], "none"))
-					noflags = ReadFlagString(sBuffer[3]);
-				
-				AddAdvert(sBuffer[4], sBuffer[0], sBuffer[1], flags, noflags, false, true);
+
+			//	PrintToChatAll("Adding Advert ID: %s\nType: %s\nText: %s\nFlags: %s\nNoFlags: %s", sBuffer[4], sBuffer[0], sBuffer[1], sBuffer[2], sBuffer[3]);
+
+				AddAdvert(sBuffer[4], sBuffer[0], sBuffer[1], sBuffer[2], sBuffer[3], false, true);
 			}
 			while (KvGotoNextKey(kv));
-			CloseHandle(kv);*/
+			CloseHandle(kv);
 		} 
 		else 
 		{
@@ -1103,18 +1137,19 @@ stock parseAdvertisements()
 stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_maxLength)
 {
 	strcopy(outputText, outputText_maxLength, inputText);
-	decl String:part[256], String:replace[128];
+	decl String:part[128], String:replace[128];
 	for (new i = 0; i < 100; i++) 
 	{
 		if (FindCharInString(outputText, '{') != -1 || FindCharInString(outputText, '}') != -1)
 		{
-			if (MatchRegex(g_hDynamicTagRegex, part) > 0)
+			if (MatchRegex(g_hDynamicTagRegex, outputText) > 0)
 			{
-				GetRegexSubString(g_hDynamicTagRegex, 0, replace, sizeof(replace));
-				if (!StrContains(replace, "{CONVAR_BOOL:", false))
+				GetRegexSubString(g_hDynamicTagRegex, 0, part, sizeof(part));
+				strcopy(replace, sizeof(replace), part);
+				if (StrContains(part, "{CONVAR_BOOL:", false) == 0)
 				{
 					replace[FindCharInString(replace, '}')] = '\0';
-					new Handle:conVarFound = FindConVar(replace[14]);
+					new Handle:conVarFound = FindConVar(replace[13]);
 					if (conVarFound != INVALID_HANDLE)
 					{
 						new conVarValue = GetConVarInt(conVarFound);
@@ -1126,10 +1161,10 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 					else
 						replace[0] = '\0';
 				}
-				else if (!StrContains(replace, "{CONVAR:", false))
+				else if (StrContains(part, "{CONVAR:", false) == 0)
 				{
 					replace[FindCharInString(replace, '}')] = '\0';
-					new Handle:conVarFound = FindConVar(replace[9]);
+					new Handle:conVarFound = FindConVar(replace[8]);
 					if (conVarFound != INVALID_HANDLE)
 						GetConVarString(conVarFound, replace, sizeof(replace));
 					else

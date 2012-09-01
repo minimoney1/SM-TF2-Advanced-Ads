@@ -24,12 +24,12 @@
 	}
 	"Add_Usage"
 	{
-		"en"		"Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> [Flags] [NoFlags]"
+		"en"		"Usage: sm_addadvert <Advert Id> <Advert Type> <Advert Text> <Flags> <NoFlags> <Jump To: 1|0> <Replace: 1|0>"
 	}
 	"Add_Success"
 	{
 		"#format"	"{1:s}"
-		"en"		"Advert Id \"{1|\" was successfully added!"
+		"en"		"Advert Id \"{1}\" was successfully added!"
 	}
 	"Add_Fail"
 	{
@@ -40,5 +40,8 @@
 	{
 		"en"		"The given advertisement was not found."
 	}
-
+	"Dumped_Ads"
+	{
+		"en"		"The adverts have been successfully dumped to \"configs/dump_ads.txt\"."
+	}
 }
