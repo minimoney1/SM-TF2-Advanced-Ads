@@ -26,7 +26,130 @@ enum advType
 	advType_Say,
 	advType_Top,
 	advType_Max
-}
+};
+
+funcenum ExtraTagFunc
+{
+	/**
+	 *
+	 * The callback function when a tag is found.
+	 *
+	 * @param advertText The text of the advert that contains the tag.
+	 * @param tag 		 The replaced tag string that you need to modify. (By-Ref) Note: Copy the tag replacement directly into this string
+	 * @param tagActual  The actual representation of the tag or the regex for comparision purposes only. This is constant and you need to change the tag param to have changes apply.
+	 *
+	 * @note 			 The tagActual param contains the regex pattern in dynamic tag callbacks. 
+	 *
+	 *
+	 * @return 			 Plugin_Changed to change the tag and move on; Plugin_Continue and Plugin_Handled ignore the action while Plugin_Stop ignores custom tags (modules) completely.
+	 *
+	 */
+	Action:public(const String:advertText[], String:tag[], const String:tagActual[])
+};
+
+/**
+ *
+ * Adds an extra tag to the advert tag detection list.
+ * 
+ * 
+ * @param tag 			The string containing the tag that is detected (without the '{' and '}')
+ * @param func 			The callback function which is called when the tag is detected in an advert
+ * 
+ * @noreturn
+ * 
+ */
+
+native AddExtraTag(const String:tag[], ExtraTagFunc:func);
+
+/**
+ *
+ * Adds an extra tag to the advert tag detection list.
+ * 
+ * 
+ * @param pattern		The regex pattern that matches the tag (including the curly braces '{' and '}')
+ * @param func 			The callback function which is called when the tag is detected in an advert
+ * @param flags 		The REGEX flags that you want to add to this tag detection system (see regex.inc)
+ * 
+ * @note 				Make sure you add the curly braces.
+ * @note 				Make sure that you either add the curly braces to regex as '[{]' or '\\{'
+ *
+ * @noreturn
+ * 
+ */
+
+native AddExtraDynamicTag(const String:pattern[], ExtraTagFunc:func, flags = 0);
+
+
+funcenum ExtraClientTagFunc 
+{
+	/**
+	 *
+	 * The callback function when a tag is found.
+	 *
+	 * @param client 	 The index of the client viewing the tag.
+	 * @param advertText The text of the advert that contains the tag.
+	 * @param tag 		 The replaced tag string that you need to modify. (By-Ref) Note: Copy the tag replacement directly into this string
+	 * @param tagActual  The actual representation of the tag or the regex for comparision purposes only. This is constant and you need to change the tag param to have changes apply.
+	 *
+	 * @note 			 The tagActual param contains the regex pattern in dynamic tag callbacks. 
+	 *
+	 *
+	 * @return 			 Plugin_Changed to change the tag and move on; Plugin_Continue and Plugin_Handled ignore the action while Plugin_Stop ignores custom tags (modules) completely.
+	 *
+	 */
+	Action:public(client, const String:advertText[], String:tag[], const String:tagActual[])
+};
+
+/**
+ *
+ * Adds an extra client tag to the advert tag detection list.
+ * 
+ * @param tag 			The string containing the client tag that is detected (without the '{' and '}')
+ * @param func 			The callback function which is called when the tag is detected in an advert
+ * 
+ *
+ * @noreturn
+ * 
+ */
+
+native AddExtraClientTag(const String:tag[], ExtraClientTagFunc:func);
+
+/**
+ *
+ * Adds an extra client tag to the advert tag detection list.
+ * 
+ * @param pattern		The regex pattern that matches the tag (including the curly braces '{' and '}')
+ * @param func 			The callback function which is called when the tag is detected in an advert
+ * @param flags 		The REGEX flags that you want to add to this tag detection system (see regex.inc)
+ * 
+ * @note 				Make sure you add the curly braces.
+ * @note 				Make sure that you either add the curly braces to regex as '[{]' or '\\{'
+ *
+ * @noreturn
+ * 
+ */
+
+native AddExtraDynamicClientTag(const String:pattern[], ExtraClientTagFunc:func, flags = 0);
+
+/**
+ *
+ * Gets an advert's information from its advert id.
+ *
+ * @param advertId 						The ID of the advert that you want the information of.
+ * @param advertType					The string that will hold the advert's type.
+ * @param advertType_maxlength 			The maxlength for the advertType string.
+ * @param advertText 					The string that will hold the advert text string.
+ * @param advertText_maxlength 			The maxlength of the advertText string.
+ * @param advertFlags 					The string that will hold the advert's flag string.
+ * @param advertFlags_maxlength 		The maxlength of the advert flags string.
+ * @param advertNoFlags 				The string that will hold the advert's noflag string.
+ * @param advertNoFlags_maxlength		The maxlength of the advertNoFlags string. 
+ *
+ * @return True if the advert was found and the info was gotten, false otherwise.
+ * 
+ */
+
+native bool:GetAdvertInfo(const String:advertId[], String:advertType[], advertType_maxlength, String:advertText[], advertText_maxlength, String:advertFlags[], advertFlag_maxlength, String:advertNoFlags[], advertNoFlags_maxlength);
 
 /**
  * 

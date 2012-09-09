@@ -27,6 +27,10 @@
 #endif
 
 new Handle:g_hPluginEnabled = INVALID_HANDLE;
+new Handle:g_hFuncArray = INVALID_HANDLE;
+new Handle:g_hDynamicTagArray = INVALID_HANDLE;
+new Handle:g_hDynamicClientTagArray = INVALID_HANDLE;
+new Handle:g_hClientTagArray = INVALID_HANDLE;
 new Handle:g_hRootAccess = INVALID_HANDLE;
 new Handle:g_hAdvertDelay = INVALID_HANDLE;
 new Handle:g_hAdvertFile = INVALID_HANDLE;
@@ -57,6 +61,7 @@ new	Handle:g_hForwardPreAddTopColor,
 	Handle:g_hForwardPostAddAdvert,
 	Handle:g_hForwardPreDeleteAdvert,
 	Handle:g_hForwardOnLoadedPost,
+	// Handle:g_hPrivateForwardTag,
 	Handle:g_hForwardPostDeleteAdvert;
 
 new bool:g_bPluginEnabled,
@@ -129,6 +134,10 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	MarkNativeAsOptional("Steam_GetPublicIP");
 	MarkNativeAsOptional("Updater_AddPlugin");
 	MarkNativeAsOptional("Updater_RemovePlugin");
+	CreateNative("AddExtraTag", Native_AddExtraTag);
+	CreateNative("AddExtraClientTag", Native_AddExtraClientTag);
+	CreateNative("AddExtraDynamicTag", Native_AddDynamicExtraTag);
+	CreateNative("AddExtraDynamicClientTag", Native_AddDynamicExtraClientTag);
 	CreateNative("AddExtraTopColor", Native_AddTopColorToTrie);
 	CreateNative("Client_CanViewAds", Native_CanViewAdvert);
 	CreateNative("AddAdvert", Native_AddAdvert);
@@ -136,10 +145,85 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("ReloadAdverts", Native_ReloadAds);
 	CreateNative("DeleteAdvert", Native_DeleteAdvert);
 	CreateNative("AdvertExists", Native_AdvertExists);
+	CreateNative("GetAdvertInfo", Native_GetAdvertInfo);
 	#if defined ADVERT_SOURCE2009
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
+}
+
+public Native_AddDynamicExtraTag(Handle:plugin, numParams)
+{
+	decl String:pattern[512];
+	GetNativeString(1, pattern, sizeof(pattern));
+	new Function:func = GetNativeCell(2);
+	PushArrayString(g_hDynamicTagArray, pattern);
+	PushArrayCell(g_hDynamicTagArray, _:func);
+	PushArrayCell(g_hDynamicTagArray, plugin);
+	PushArrayCell(g_hDynamicTagArray, GetNativeCell(3));
+}
+
+public Native_AddDynamicExtraClientTag(Handle:plugin, numParams)
+{
+	decl String:pattern[512];
+	GetNativeString(1, pattern, sizeof(pattern));
+	new Function:func = GetNativeCell(2);
+	PushArrayString(g_hDynamicClientTagArray, pattern);
+	PushArrayCell(g_hDynamicClientTagArray, _:func);
+	PushArrayCell(g_hDynamicClientTagArray, plugin);
+	PushArrayCell(g_hDynamicClientTagArray, GetNativeCell(3));
+}
+
+public Native_GetAdvertInfo(Handle:plugin, numParams)
+{
+	decl String:advertId[64];
+	GetNativeString(1, advertId, sizeof(advertId));
+	if (!AdvertExists(advertId))
+		return false;
+	KvSavePosition(g_hAdvertisements);
+	new atype_ml = GetNativeCell(3),
+	atext_ml = GetNativeCell(5),
+	aflags_ml = GetNativeCell(7),
+	anoflags_ml = GetNativeCell(9);
+	decl String:aType[atype_ml];
+	KvGetString(g_hAdvertisements, "type", aType, atype_ml);
+	SetNativeString(2, aType, atype_ml);
+	decl String:aText[atext_ml];
+	KvGetString(g_hAdvertisements, "text", aText, atext_ml);
+	SetNativeString(4, aText, atext_ml);
+	decl String:aFlags[aflags_ml];
+	KvGetString(g_hAdvertisements, "flags", aFlags, aflags_ml);
+	SetNativeString(6, aFlags, aflags_ml);
+	decl String:aNoFlags[anoflags_ml];
+	KvGetString(g_hAdvertisements, "noflags", aNoFlags, anoflags_ml);
+	SetNativeString(8, aNoFlags, anoflags_ml);
+	return true;
+}
+
+public Native_AddExtraClientTag(Handle:plugin, numParams)
+{
+	decl String:tag[128];
+	GetNativeString(1, tag, sizeof(tag));
+	String_ToLower(tag, tag, sizeof(tag));
+	if (tag[0] != '{' && tag[strlen(tag) - 1] != '}')
+		Format(tag, sizeof(tag), "{%s}", tag);
+	new Function:func = GetNativeCell(2);
+	PushArrayString(g_hClientTagArray, tag);
+	PushArrayCell(g_hClientTagArray, _:func);
+	PushArrayCell(g_hClientTagArray, plugin);
+}
+
+public Native_AddExtraTag(Handle:plugin, numParams)
+{
+	decl String:tag[128];
+	GetNativeString(1, tag, sizeof(tag));
+	String_ToLower(tag, tag, sizeof(tag));
+	if (tag[0] != '{' && tag[strlen(tag) - 1] != '}')
+		Format(tag, sizeof(tag), "{%s}", tag);
+	new Function:func = GetNativeCell(2);
+	PushArrayString(g_hFuncArray, tag);
+	PushArrayCell(g_hFuncArray, _:func);
+	PushArrayCell(g_hFuncArray, plugin);
 }
 
 public Native_AdvertExists(Handle:plugin, numParams)
@@ -435,6 +519,10 @@ public OnPluginStart()
 	
 	LoadTranslations("extended_advertisements.phrases");
 	
+	g_hFuncArray = CreateArray(128);
+	g_hClientTagArray = CreateArray(128);
+	g_hDynamicTagArray = CreateArray(256);
+	g_hDynamicClientTagArray = CreateArray(256);	
 	
 	RegAdminCmd("sm_reloadads", Command_ReloadAds, ADMFLAG_RCON);
 	RegAdminCmd("sm_showad", Command_ShowAd, ADMFLAG_RCON);
@@ -460,6 +548,7 @@ public OnPluginStart()
 	g_hForwardPostAddAdvert = CreateGlobalForward("OnAddAdvertPost", ET_Ignore, Param_String, Param_String, Param_String, Param_String, Param_String, Param_Cell, Param_Cell);
 	g_hForwardPreDeleteAdvert = CreateGlobalForward("OnPreDeleteAdvert", ET_Hook, Param_String, Param_Cell);
 	g_hForwardPostDeleteAdvert = CreateGlobalForward("OnPostDeleteAdvert", ET_Ignore, Param_String);
+	//g_hPrivateForwardTag = CreateForward(ET_Hook, Param_String, Param_String, Param_String);
 	
 	g_hDynamicTagRegex = CompileRegex("\\{([Cc][Oo][Nn][Vv][Aa][Rr](_[Bb][Oo][Oo][Ll])?):([A-Za-z0-9_!@#$%^&*()\\-~`+=]+\\})", PCRE_CASELESS|PCRE_UNGREEDY);
 	
@@ -494,7 +583,10 @@ public Action:Command_DumpAds(client, args)
 	decl String:file[256];
 	BuildPath(Path_SM, file, sizeof(file), "configs/dump_ads.txt");
 	OpenFile(file, "w");
+	KvSavePosition(g_hAdvertisements);
+	KvGoBack(g_hAdvertisements);
 	KeyValuesToFile(g_hAdvertisements, file);
+	KvRewind(g_hAdvertisements);
 	ReplyToCommand(client, "%t %t", "Advert_Tag", "Dumped_Ads");
 	return Plugin_Handled;
 }
@@ -530,7 +622,7 @@ public Action:Command_AddAdvert(client, args)
 	for (new i = 0; i < args; i++)
 	{
 		GetCmdArg((i + 1), arg[i], sizeof(arg[]));
-		PrintToChatAll("Got %s", args[i]);
+		//PrintToChatAll("Got %s", arg[i]);
 	}
 	if (AddAdvert(arg[0], arg[1], arg[2], arg[3], arg[4], (StringToInt(arg[5]) ? true : false), (StringToInt(arg[6]) ? true : false)))
 		ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
@@ -808,8 +900,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		strcopy(sBuffer, sizeof(sBuffer), sText);
 		
 		if (StrContains(sType, "C", false) != -1) 
-		{
-			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+		{			
 			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
@@ -827,12 +918,12 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
+					String_RemoveExtraTags(sBuffer2, sizeof(sBuffer2));
 					PrintCenterText(client, sBuffer2);	
 					new Handle:hCenterAd;
 					g_hCenterAd[client] = CreateDataTimer(1.0, Timer_CenterAd, hCenterAd, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
 					WritePackCell(hCenterAd,   GetClientUserId(client));
 					WritePackString(hCenterAd, sBuffer2);
-					
 				}
 				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
 			}
@@ -840,8 +931,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
 		if (StrContains(sType, "H", false) != -1) 
-		{
-			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+		{			
 			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
@@ -859,6 +949,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
+					String_RemoveExtraTags(sBuffer2, sizeof(sBuffer2));
 					PrintHintText(client, sBuffer2);
 				}
 				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
@@ -867,18 +958,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
 		if (StrContains(sType, "M", false) != -1) 
-		{
-			new Handle:hPl = CreatePanel();
-			DrawPanelText(hPl, sBuffer);
-			if (g_bExitPanel)
-			{
-				DrawPanelText(hPl, " \n \n \n");
-				DrawPanelItem(hPl, "Exit");
-			}
-
-			SetPanelCurrentKey(hPl, 10);
-			
-			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
+		{	
 			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
@@ -896,18 +976,26 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
+					String_RemoveExtraTags(sBuffer2, sizeof(sBuffer2));
+					new Handle:hPl = CreatePanel();
+					DrawPanelText(hPl, sBuffer);
+					if (g_bExitPanel)
+					{
+						DrawPanelText(hPl, " \n \n \n");
+						DrawPanelItem(hPl, " Exit");
+					}
+
+					SetPanelCurrentKey(hPl, 10);
 					SendPanelToClient(hPl, client, Handler_DoNothing, 10);
+					CloseHandle(hPl);
 				}
 				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
 			}
-			
-			CloseHandle(hPl);
 		}
 		
 		strcopy(sBuffer, sizeof(sBuffer), sText);
 		if (StrContains(sType, "S", false) != -1) 
 		{
-			String_RemoveExtraTags(sBuffer, sizeof(sBuffer), true);
 			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
@@ -925,6 +1013,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
 					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
+					String_RemoveExtraTags(sBuffer2, sizeof(sBuffer2), true);
 					CPrintToChatEx(client, client, sBuffer2);
 				}
 				strcopy(sBuffer, sizeof(sBuffer), sBuffer3);
@@ -970,9 +1059,7 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			{
 				GetTrieArray(g_hTopColorTrie, "white", value, 4);
 			}
-			
-			String_RemoveExtraTags(sBuffer, sizeof(sBuffer));
-			
+						
 			strcopy(sBuffer3, sizeof(sBuffer3), sBuffer);
 			LOOP_CLIENTS(client, CLIENTFILTER_INGAMEAUTH)
 			{
@@ -989,11 +1076,12 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 				
 				if (IsPassedFwd(forwardReturn) && Client_CanViewAds(client, flagBits, noFlagBits))
 				{
+					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
+					String_RemoveExtraTags(sBuffer2, sizeof(sBuffer2));
 					new Handle:hKv = CreateKeyValues("Stuff", "title", sBuffer2);
 					KvSetColor(hKv, "color", value[0], value[1], value[2], value[3]);
 					KvSetNum(hKv,   "level", 1);
 					KvSetNum(hKv,   "time",  10);
-					ReplaceClientText(client, sBuffer, sBuffer2, sizeof(sBuffer2));
 					CreateDialog(client, hKv, DialogType_Msg);
 					if (hKv != INVALID_HANDLE)
 						CloseHandle(hKv);
@@ -1144,7 +1232,10 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 		{
 			if (MatchRegex(g_hDynamicTagRegex, outputText) > 0)
 			{
-				GetRegexSubString(g_hDynamicTagRegex, 0, part, sizeof(part));
+				if (!GetRegexSubString(g_hDynamicTagRegex, 0, part, sizeof(part)))
+				{
+					continue;
+				}
 				strcopy(replace, sizeof(replace), part);
 				if (StrContains(part, "{CONVAR_BOOL:", false) == 0)
 				{
@@ -1181,60 +1272,70 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 	
 	new i = 1;
 	decl String:strTemp[256];
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		GetServerIP(strTemp, sizeof(strTemp));
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		GetServerIP(strTemp, sizeof(strTemp), true);
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		Format(strTemp, sizeof(strTemp), "%i", Server_GetPort());
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		GetCurrentMap(strTemp, sizeof(strTemp));
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		GetNextMap(strTemp, sizeof(strTemp));
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		IntToString(g_iTickrate, strTemp, sizeof(strTemp));
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		FormatTime(strTemp, sizeof(strTemp), "%I:%M:%S%p");
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		FormatTime(strTemp, sizeof(strTemp), "%H:%M:%S");
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		FormatTime(strTemp, sizeof(strTemp), "%x");
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	i++;
+	strTemp[0] = '\0';
 	if (StrContains(outputText, g_tagRawText[i], false) != -1)
 	{
 		new iMins, iSecs, iTimeLeft;
@@ -1249,6 +1350,93 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 		ReplaceString(outputText, outputText_maxLength, g_tagRawText[i], strTemp, false);
 	}
 	strTemp[0] = '\0';
+	decl String:tag[128],
+		 String:actual[128];
+	new Function:func,
+		Handle:plugin,
+		Action:returnVal = Plugin_Continue,
+		size = GetArraySize(g_hFuncArray),
+		x = 0;
+	while (x < size)
+	{
+		returnVal = Plugin_Continue;
+		GetArrayString(g_hFuncArray, i, actual, sizeof(actual));
+		if (StrContains(outputText, actual, false) == -1)
+			continue;
+		strcopy(tag, sizeof(tag), actual);
+		x++;
+		func = GetArrayCell(g_hFuncArray, x);
+		x++;
+		plugin = GetArrayCell(g_hFuncArray, x);
+		x++;
+		Call_StartFunction(plugin, func);
+		Call_PushString(outputText);
+		Call_PushStringEx(tag, sizeof(tag), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+		Call_PushString(actual);
+		Call_Finish(_:returnVal);
+		if (returnVal == Plugin_Stop)
+			break;
+		if (returnVal != Plugin_Changed)
+			continue;
+		ReplaceString(outputText, outputText_maxLength, actual, tag, false);
+	}
+	x = 0;
+	size = GetArraySize(g_hDynamicTagArray);
+	new bool:stop = false,
+		bool:con = false,
+		flags = 0;
+	while (x < size)
+	{
+		flags = 0;
+		func = GetArrayCell(g_hDynamicTagArray, x);
+		x++;
+		plugin = GetArrayCell(g_hDynamicTagArray, x);
+		x++;
+		GetArrayString(g_hDynamicTagArray, i, actual, sizeof(actual));
+		x++;
+		flags = GetArrayCell(g_hDynamicTagArray, x);
+		x++;
+		stop = false;
+		con = false;
+		new Handle:regex = CompileRegex(actual, flags);
+		for (new j = 0; j < 100; j++)
+		{
+			stop = false;
+			con = false;
+			returnVal = Plugin_Continue;
+			if (FindCharInString(outputText, '{') == -1 || FindCharInString(outputText, '}') == -1)
+				break;
+			if (MatchRegex(regex, outputText) > 0)
+			{
+				if (!GetRegexSubString(regex, 0, tag, sizeof(tag)))
+				{
+					continue;
+				}
+				Call_StartFunction(plugin, func);
+				Call_PushString(outputText);
+				Call_PushStringEx(tag, sizeof(tag), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+				Call_PushString(actual);
+				Call_Finish(_:returnVal);
+				if (returnVal == Plugin_Stop)
+				{
+					stop = true;
+					break;
+				}
+				if (returnVal != Plugin_Changed)
+				{
+					con = true;
+					continue;
+				}
+			}
+			else
+				break;
+		}
+		if (stop)
+			break;
+		if (con)
+			continue;
+		ReplaceString(outputText, outputText_maxLength, actual, tag, false);
+	}
 }
 
 stock ReplaceClientText(client, const String:inputText[], String:outputText[], outputText_maxLength)
@@ -1265,38 +1453,148 @@ stock ReplaceClientText(client, const String:inputText[], String:outputText[], o
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
+		strTemp[0] = '\0';
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			GetClientAuthString(client, strTemp, sizeof(strTemp));
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
+		strTemp[0] = '\0';
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			GetClientIP(client, strTemp, sizeof(strTemp));
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
+		strTemp[0] = '\0';
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			GetClientIP(client, strTemp, sizeof(strTemp), false);
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
+		strTemp[0] = '\0';
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			Format(strTemp, sizeof(strTemp), "%d", GetClientTime(client));
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		i++;
+		strTemp[0] = '\0';
 		if (StrContains(outputText, g_clientRawText[i], false) != -1)
 		{
 			Format(strTemp, sizeof(strTemp), "%d", Client_GetMapTime(client));
 			ReplaceString(outputText, outputText_maxLength, g_clientRawText[i], strTemp, false);
 		}
 		strTemp[0] = '\0';
+		decl String:tag[128],
+			 String:actual[128];
+		new Function:func,
+			Handle:plugin,
+			Action:returnVal = Plugin_Continue,
+			size = GetArraySize(g_hClientTagArray),
+			x = 0;
+		while (x < size)
+		{
+			returnVal = Plugin_Continue;
+			GetArrayString(g_hClientTagArray, i, actual, sizeof(actual));
+			if (StrContains(outputText, actual, false) == -1)
+				continue;
+			strcopy(tag, sizeof(tag), actual);
+			x++;
+			func = GetArrayCell(g_hClientTagArray, x);
+			x++;
+			plugin = GetArrayCell(g_hClientTagArray, x);
+			x++;
+			Call_StartFunction(plugin, func);
+			Call_PushCell(client);
+			Call_PushString(outputText);
+			Call_PushStringEx(tag, sizeof(tag), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+			Call_PushString(actual);
+			Call_Finish(_:returnVal);
+			if (returnVal == Plugin_Stop)
+				break;
+			if (returnVal != Plugin_Changed)
+				continue;
+			ReplaceString(outputText, outputText_maxLength, actual, tag, false);
+		}
+		x = 0;
+		size = GetArraySize(g_hDynamicClientTagArray);
+		new bool:stop = false,
+			bool:con = false,
+			flags = 0;
+		while (x < size)
+		{
+			flags = 0;
+			func = GetArrayCell(g_hDynamicClientTagArray, x);
+			x++;
+			plugin = GetArrayCell(g_hDynamicClientTagArray, x);
+			x++;
+			GetArrayString(g_hDynamicClientTagArray, i, actual, sizeof(actual));
+			x++;
+			flags = GetArrayCell(g_hDynamicClientTagArray, x);
+			x++;
+			stop = false;
+			con = false;
+			new Handle:regex = CompileRegex(actual, flags);
+			for (new j = 0; j < 100; j++)
+			{
+				stop = false;
+				con = false;
+				returnVal = Plugin_Continue;
+				if (FindCharInString(outputText, '{') == -1 || FindCharInString(outputText, '}') == -1)
+					break;
+				if (MatchRegex(regex, outputText) > 0)
+				{
+					if (!GetRegexSubString(regex, 0, tag, sizeof(tag)))
+					{
+						continue;
+					}
+					Call_StartFunction(plugin, func);
+					Call_PushCell(client);
+					Call_PushString(outputText);
+					Call_PushStringEx(tag, sizeof(tag), SM_PARAM_STRING_UTF8|SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
+					Call_PushString(actual);
+					Call_Finish(_:returnVal);
+					if (returnVal == Plugin_Stop)
+					{
+						stop = true;
+						break;
+					}
+					if (returnVal != Plugin_Changed)
+					{
+						con = true;
+						continue;
+					}
+				}
+				else
+					break;
+			}
+			if (stop)
+				break;
+			if (con)
+				continue;
+			ReplaceString(outputText, outputText_maxLength, actual, tag, false);
+		}
 	}
 	return;
+}
+
+stock SimpleRegexMatch_Ads(const String:str[], const String:pattern[], flags = 0, String:error[]="", maxLen = 0)
+{
+	new Handle:regex = CompileRegex(pattern, flags, error, maxLen);
+	
+	if (regex == INVALID_HANDLE)
+	{
+		return -1;	
+	}
+	
+	new substrings = MatchRegex(regex, str);
+	
+	CloseHandle(regex);
+	
+	return substrings;	
 }
 
 stock GetServerIP(String:ipAddress[], serverIP_maxLength, bool:fullIp = false)
@@ -1479,27 +1777,24 @@ stock String_RemoveExtraTags(String:inputString[], inputString_maxLength, bool:i
 stock Server_GetIPNumString(String:ipBuffer[], ipBuffer_maxLength, bool:useSteamTools)
 {
 	new ip;
-	switch (useSteamTools)
+	if (useSteamTools)
 	{
-		case true:
-		{
-			new octets[4];
-			Steam_GetPublicIP(octets);
-			ip =
-				octets[0] << 24	|
-				octets[1] << 16	|
-				octets[2] << 8	|
-				octets[3];
-			LongToIP(ip, ipBuffer, ipBuffer_maxLength);
-		}
-		case false:
-		{
-			new Handle:conVarHostIP = INVALID_HANDLE;
-			if (conVarHostIP == INVALID_HANDLE)
-				conVarHostIP = FindConVar("hostip");
-			ip = GetConVarInt(conVarHostIP);
-			LongToIP(ip, ipBuffer, ipBuffer_maxLength);
-		}
+		new octets[4];
+		Steam_GetPublicIP(octets);
+		ip =
+			octets[0] << 24	|
+			octets[1] << 16	|
+			octets[2] << 8	|
+			octets[3];
+		LongToIP(ip, ipBuffer, ipBuffer_maxLength);
+	}
+	else
+	{
+		new Handle:conVarHostIP = INVALID_HANDLE;
+		if (conVarHostIP == INVALID_HANDLE)
+			conVarHostIP = FindConVar("hostip");
+		ip = GetConVarInt(conVarHostIP);
+		LongToIP(ip, ipBuffer, ipBuffer_maxLength);	
 	}
 }
 

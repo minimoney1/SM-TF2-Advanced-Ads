@@ -29,7 +29,6 @@ public OnPluginStart()
 	if (g_bLoad)
 	{
 		PrintToChatAll("%s", (AddExtraChatColor("test", 0xBDB76B) ? "Added Color" : "Color Not Added"));
-		AddAdvert("", "S", "HALLO");
 	}
 }
 
@@ -48,7 +47,9 @@ public Action:OnAdvertPreClientReplace(client, const advType:curType, const Stri
 {
 	if (curType == advType_Say)
 	{
-		
+		decl String:tag[64];
+		Format(tag, sizeof(tag), "{test}%s", g_strTag);
+		if (StrContains(advertText, tag, false) != 0)
 			Format(advertText, 512, "{test}%s %s", g_strTag, advertText);
 	}
 }

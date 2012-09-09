@@ -1,8 +1,8 @@
 /**************************************************************************
  *                                                                        *
  *                       Colored Chat Functions                           *
- *                            Author: exvel                               *
- *                           Version: 1.0.5                               *
+ *                            Author: exvel, modified by minimoney1       *
+ *                           Version: 1.0.5-ads                           *
  *                                                                        *
  **************************************************************************/
 
@@ -233,37 +233,37 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 	{
 		if (CProfile_SayText2)
 		{
-			ReplaceString(szMessage, maxlength, "{teamcolor}", "\x03");
+			ReplaceString(szMessage, maxlength, "{teamcolor}", "\x03", false);
 			iRandomPlayer = author;
 		}
 		/* If saytext2 is not supported by game replace {teamcolor} with green tag  */
 		else
 		{
-			ReplaceString(szMessage, maxlength, "{teamcolor}", CTagCode[Color_Green]);
+			ReplaceString(szMessage, maxlength, "{teamcolor}", CTagCode[Color_Green], false);
 		}
 	}
 	else
 	{
-		ReplaceString(szMessage, maxlength, "{teamcolor}", "");
+		ReplaceString(szMessage, maxlength, "{teamcolor}", "", false);
 	}
 	
 	/* For other color tags we need a loop */
 	for (new i = 0; i < MAX_COLORS; i++)
 	{
 		/* If tag not found - skip */
-		if (StrContains(szMessage, CTag[i]) == -1)
+		if (StrContains(szMessage, CTag[i], false) == -1)
 		{
 			continue;
 		}
 		/* If tag is not supported by game replace it with green tag */
 		else if (!CProfile_Colors[i])
 		{
-			ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green]);
+			ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green], false);
 		}
 		/* If tag doesn't need saytext2 simply replace */
 		else if (!CTagReqSayText2[i])
 		{
-			ReplaceString(szMessage, maxlength, CTag[i], CTagCode[i]);
+			ReplaceString(szMessage, maxlength, CTag[i], CTagCode[i], false);
 		}
 		/* Tag needs saytext2 */
 		else
@@ -271,7 +271,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 			/* If saytext2 is not supported by game replace tag with green tag */
 			if (!CProfile_SayText2)
 			{
-				ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green]);
+				ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green], false);
 			}
 			/* Game supports saytext2 */
 			else 
@@ -285,12 +285,12 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 					/* If player not found replace tag with green color tag */
 					if (iRandomPlayer == NO_PLAYER)
 					{
-						ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green]);
+						ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green], false);
 					}
 					/* If player was found simply replace */
 					else
 					{
-						ReplaceString(szMessage, maxlength, CTag[i], CTagCode[i]);
+						ReplaceString(szMessage, maxlength, CTag[i], CTagCode[i], false);
 					}
 					
 				}
