@@ -48,7 +48,8 @@ new Handle:g_hCenterAd[MAXPLAYERS + 1];
 
 new Handle:g_hTopColorTrie = INVALID_HANDLE;
 
-new Handle:g_hForwardPreReplace,
+new Handle:g_hForwardPreLoadPre,
+	Handle:g_hForwardPreReplace,
 	Handle:g_hForwardPreClientReplace,
 	Handle:g_hForwardPostAdvert;
 #if defined ADVERT_SOURCE2009	
@@ -146,10 +147,25 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("DeleteAdvert", Native_DeleteAdvert);
 	CreateNative("AdvertExists", Native_AdvertExists);
 	CreateNative("GetAdvertInfo", Native_GetAdvertInfo);
+	CreateNative("GetNumAdverts", Native_GetNumAdverts);
 	#if defined ADVERT_SOURCE2009
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
+}
+
+public Native_GetNumAdverts(Handle:plugin, numParams)
+{
+	new i = 0;
+	KvSavePosition(g_hAdvertisements);
+	KvGoBack(g_hAdvertisements);
+	KvGotoFirstSubKey(g_hAdvertisements);
+	while (KvGotoNextKey(g_hAdvertisements))
+	{
+		i++;
+	}
+	KvRewind(g_hAdvertisements);
+	return i;
 }
 
 public Native_AddDynamicExtraTag(Handle:plugin, numParams)
@@ -319,16 +335,15 @@ public Native_AddAdvert(Handle:plugin, numParams)
 	GetNativeString(1, advertId, sizeof(advertId));
 	if (!strcmp(advertId, "") || !strcmp(advertId, "none", false))
 	{
+		new numAdverts = GetNumAdverts();
 		KvSavePosition(g_hAdvertisements);
-		KvGoBack(g_hAdvertisements);
-		KvGotoFirstSubKey(g_hAdvertisements);
-		while (KvGotoNextKey(g_hAdvertisements))
+		new i = 1;
+		do
 		{
-			continue;
+			i++;
+			FormatEx(advertId, sizeof(advertId), "%i", (numAdverts + i));
 		}
-		KvGetSectionName(g_hAdvertisements, advertId, sizeof(advertId));
-		new id = StringToInt(advertId);
-		FormatEx(advertId, sizeof(advertId), "%i", (id + 1));
+		while (KvJumpToKey(g_hAdvertisements, advertId));
 		KvRewind(g_hAdvertisements);
 	}
 	decl String:advertText[512], String:advertType[16];
@@ -535,6 +550,7 @@ public OnPluginStart()
 	
 	g_hForwardOnLoadedPost = CreateGlobalForward("OnAdvertsLoaded", ET_Ignore);
 
+	g_hForwardPreLoadPre = CreateGlobalForward("OnAdvertPreLoadPre", ET_Hook);
 	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Hook, Param_Cell, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef, Param_CellByRef);
@@ -857,6 +873,12 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 {
 	if (g_bPluginEnabled)
 	{
+		new Action:forwardReturn = Plugin_Continue;
+		Call_StartForward(g_hForwardPreLoadPre);
+		Call_Finish(_:forwardReturn);
+		if (forwardReturn == Plugin_Handled || forwardReturn == Plugin_Stop)
+			return Plugin_Continue;
+
 		decl String:sFlags[32], String:sText[512], String:sType[6], String:sBuffer[256], String:sBuffer2[256], String:sBuffer3[256], String:sectionName[128];
 		new flagBits = -1,
 			noFlagBits = -1;
@@ -876,8 +898,6 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 			KvRewind(g_hAdvertisements);
 			KvGotoFirstSubKey(g_hAdvertisements);
 		}
-			
-		new Action:forwardReturn = Plugin_Continue;
 
 		if (StrContains(sText, "\\n") != -1)
 		{

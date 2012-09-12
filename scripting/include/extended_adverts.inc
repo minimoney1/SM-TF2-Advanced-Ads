@@ -133,6 +133,15 @@ native AddExtraDynamicClientTag(const String:pattern[], ExtraClientTagFunc:func,
 
 /**
  *
+ * Gets the number of adverts loaded at the moment.
+ *
+ * @return The number of adverts loaded
+ *
+ */
+native GetNumAdverts();
+
+/**
+ *
  * Gets an advert's information from its advert id.
  *
  * @param advertId 						The ID of the advert that you want the information of.
@@ -266,6 +275,14 @@ native bool:Client_CanViewAds(client, flagBits = -1, noFlagBits = -1);
  * @return				True if the color was added, false if a color with an equal name was found or another issue occured (Such as a blockage by an external plugin)
  */
 native bool:AddExtraChatColor(String:colorName[], hex);
+
+/**
+ *
+ * Called before an advert gets loaded to show.
+ *
+ */
+
+forward OnAdvertPreLoadPre();
 
 /**
  *
