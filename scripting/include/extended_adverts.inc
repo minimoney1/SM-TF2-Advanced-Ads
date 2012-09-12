@@ -133,11 +133,37 @@ native AddExtraDynamicClientTag(const String:pattern[], ExtraClientTagFunc:func,
 
 /**
  *
+ * Jumps straight to an advertisement by its id.
+ *
+ * @param advertId 		The id of the advertisement to jump to.
+ *
+ * @return 				True if the advertisement was found and jumped to, false otherwise.
+ *
+ */
+
+native JumpToAdvert(String:advertId[]);
+
+/**
+ *
+ * Gets a random advert from the list.
+ *
+ * @advertId 			The string in which the advert id would be stored in.
+ * @maxlength 			The maxlength of the advertId string.
+ *
+ * @return True if the action was successful. False otherwise.
+ *
+ */
+
+native bool:GetRandomAdvert(String:advertId[], maxlength);
+
+/**
+ *
  * Gets the number of adverts loaded at the moment.
  *
  * @return The number of adverts loaded
  *
  */
+ 
 native GetNumAdverts();
 
 /**
@@ -282,7 +308,7 @@ native bool:AddExtraChatColor(String:colorName[], hex);
  *
  */
 
-forward OnAdvertPreLoadPre();
+forward Action:OnAdvertPreLoadPre();
 
 /**
  *

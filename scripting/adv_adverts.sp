@@ -148,10 +148,43 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("AdvertExists", Native_AdvertExists);
 	CreateNative("GetAdvertInfo", Native_GetAdvertInfo);
 	CreateNative("GetNumAdverts", Native_GetNumAdverts);
+	CreateNative("GetRandomAdvert", Native_GetRandomAdvert);
+	CreateNative("JumpToAdvert", Native_JumpToAdvert);
 	#if defined ADVERT_SOURCE2009
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
+}
+
+public Native_JumpToAdvert(Handle:plugin, numParams)
+{
+	decl String:id[128];
+	GetNativeString(1, id, sizeof(id));
+	return (KvJumpToKey(g_hAdvertisements, id));
+}
+
+public Native_GetRandomAdvert(Handle:plugin, numParams)
+{
+	new maxlength = GetNativeCell(2);
+	decl String:id[maxlength+2];
+	new advertNum = GetNumAdverts(),
+		random = GetRandomInt(0, advertNum);
+	KvSavePosition(g_hAdvertisements);
+	KvGoBack(g_hAdvertisements);
+	KvGotoFirstSubKey(g_hAdvertisements);
+	for (new i = 0; i <= advertNum; i++)
+	{
+		if (i == random)
+		{
+			KvGetSectionName(g_hAdvertisements, id, maxlength);
+			SetNativeString(1, id, maxlength);
+			KvRewind(g_hAdvertisements);
+			return true;
+		}
+		KvGotoNextKey(g_hAdvertisements);
+	}
+	KvRewind(g_hAdvertisements);
+	return false;
 }
 
 public Native_GetNumAdverts(Handle:plugin, numParams)
