@@ -1160,19 +1160,9 @@ stock IsPassedFwd(Action:returnVal)
 
 public Handler_DoNothing(Handle:menu, MenuAction:action, param1, param2) 
 {
-	if (g_bExitPanel)
+	if (action == MenuAction_End)
 	{
-		switch (action)
-		{
-			case MenuAction_Select:
-			{
-				CloseHandle(menu);
-			}
-			case MenuAction_End:
-			{
-				CloseHandle(menu);
-			}
-		}
+		CloseHandle(menu);
 	}
 }
 
