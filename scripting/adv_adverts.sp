@@ -1251,8 +1251,6 @@ stock parseAdvertisements()
 					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer[i], sizeof(sBuffer[]), "");
 				}
 
-			//	PrintToChatAll("Adding Advert ID: %s\nType: %s\nText: %s\nFlags: %s\nNoFlags: %s", sBuffer[4], sBuffer[0], sBuffer[1], sBuffer[2], sBuffer[3]);
-
 				AddAdvert(sBuffer[4], sBuffer[0], sBuffer[1], sBuffer[2], sBuffer[3], false, true);
 			}
 			while (KvGotoNextKey(kv));
