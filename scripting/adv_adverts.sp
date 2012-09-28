@@ -1,6 +1,6 @@
 #pragma semicolon 1
 //Comment out this line if you want to use this on something other than tf2
-#define ADVERT_TF2COLORS
+#define ADVERT_SOURCE2009
 
 #include <sourcemod>
 #undef REQUIRE_EXTENSIONS
@@ -9,18 +9,18 @@
 #undef REQUIRE_PLUGIN
 #include <updater>
 #define REQUIRE_PLUGIN
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 #include <morecolors_ads>
 #else
-#include <colors>
+#include <colors_ads>
 #endif
 #include <regex>
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.7-fix"
+#define PLUGIN_VERSION "1.2.8"
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 #define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-tf2.txt"
 #else
 #define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-nontf2.txt"
@@ -34,7 +34,7 @@ new Handle:g_hAdvertTimer = INVALID_HANDLE;
 //new Handle:g_hDynamicTagRegex = INVALID_HANDLE;
 new Handle:g_hExitPanel = INVALID_HANDLE;
 new Handle:g_hExtraTopColorsPath = INVALID_HANDLE;
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 new Handle:g_hExtraChatColorsPath = INVALID_HANDLE;
 new String:g_strExtraChatColorsPath[PLATFORM_MAX_PATH];
 #endif
@@ -46,7 +46,7 @@ new Handle:g_hTopColorTrie = INVALID_HANDLE;
 new Handle:g_hForwardPreReplace,
 	Handle:g_hForwardPreClientReplace,
 	Handle:g_hForwardPostAdvert;
-#if defined ADVERT_TF2COLORS	
+#if defined ADVERT_SOURCE2009	
 new	Handle:g_hForwardPreAddChatColor,
 	Handle:g_hForwardPostAddChatColor;
 #endif
@@ -71,7 +71,7 @@ new Float:g_fTime;
 new String:g_strConfigPath[PLATFORM_MAX_PATH];
 new String:g_strExtraTopColorsPath[PLATFORM_MAX_PATH];
 
-static String:g_tagRawText[11][24] = 
+static const String:g_tagRawText[11][24] = 
 {
 	"",
 	"{IP}",
@@ -86,7 +86,7 @@ static String:g_tagRawText[11][24] =
 	"{TIMELEFT}"
 };
 
-static String:g_clientRawText[7][32] =
+static const String:g_clientRawText[7][32] =
 {
 	"",
 	"{CLIENT_NAME}",
@@ -97,13 +97,13 @@ static String:g_clientRawText[7][32] =
 	"{CLIENT_MAPTIME}"
 };
 
-static String:g_strConVarBoolText[2][5] =
+static const String:g_strConVarBoolText[2][5] =
 {
 	"OFF",
 	"ON"
 };
 
-static String:g_strKeyValueKeyList[4][8] =
+static const String:g_strKeyValueKeyList[4][8] =
 {
 	"type",
 	"text",
@@ -115,7 +115,7 @@ public Plugin:myinfo =
 {
 	name        = "Extended Advertisements",
 	author      = "Mini",
-	description = "Extended advertisement system for TF2's new color abilities for developers",
+	description = "Extended advertisement system for Source 2009 Games' new color abilities for developers",
 	version     = PLUGIN_VERSION,
 	url         = "http://forums.alliedmods.net/"
 };
@@ -133,7 +133,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("ReloadAdverts", Native_ReloadAds);
 	CreateNative("DeleteAdvert", Native_DeleteAdvert);
 	CreateNative("AdvertExists", Native_AdvertExists);
-	#if defined ADVERT_TF2COLORS
+	#if defined ADVERT_SOURCE2009
 	CreateNative("AddExtraChatColor", Native_AddChatColorToTrie);
 	#endif
 	return APLRes_Success;
@@ -141,8 +141,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 
 public Native_AdvertExists(Handle:plugin, numParams)
 {
-	new ml;
-	GetNativeStringLength(1, ml);
+	new ml = 128;
 	decl String:id[ml];
 	GetNativeString(1, id, ml);
 	KvSavePosition(g_hAdvertisements);
@@ -156,8 +155,7 @@ public Native_AdvertExists(Handle:plugin, numParams)
 
 public Native_DeleteAdvert(Handle:plugin, numParams)
 {
-	new ml;
-	GetNativeStringLength(1, ml);
+	new ml = 128;
 	decl String:id[ml];
 	GetNativeString(1, id, ml);
 	
@@ -186,7 +184,7 @@ public Native_ReloadAds(Handle:plugin, numParams)
 {
 	new bool:ads = GetNativeCell(1),
 		bool:tsay = GetNativeCell(2);
-#if defined ADVERT_TF2COLORS	
+#if defined ADVERT_SOURCE2009	
 	new bool:chat = GetNativeCell(3);
 #endif
 	if (ads)
@@ -202,7 +200,7 @@ public Native_ReloadAds(Handle:plugin, numParams)
 		initTopColorTrie();
 		parseExtraTopColors();
 	}
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 	if (chat)
 	{
 		parseExtraChatColors();
@@ -212,8 +210,7 @@ public Native_ReloadAds(Handle:plugin, numParams)
 
 public Native_ShowAdvert(Handle:plugin, numParams)
 {
-	new maxlength;
-	GetNativeStringLength(1, maxlength);
+	new maxlength = 128;
 	decl String:advertId[maxlength];
 	GetNativeString(1, advertId, maxlength);
 	new bool:order = GetNativeCell(2);
@@ -232,13 +229,10 @@ public Native_ShowAdvert(Handle:plugin, numParams)
 
 public Native_AddAdvert(Handle:plugin, numParams)
 {
-	new advertId_ml;
-	GetNativeStringLength(1, advertId_ml);
+	new advertId_ml = 128;
 	decl String:advertId[advertId_ml];
 	GetNativeString(1, advertId, advertId_ml);
-	new advertText_ml, advertType_ml;
-	GetNativeStringLength(3, advertText_ml);
-	GetNativeStringLength(2, advertType_ml);
+	new advertText_ml = 1024, advertType_ml = 128;
 	decl String:advertText[advertText_ml], String:advertType[advertType_ml];
 	GetNativeString(3, advertText, advertText_ml);
 	GetNativeString(2, advertType, advertType_ml);
@@ -306,8 +300,7 @@ public Native_AddAdvert(Handle:plugin, numParams)
 
 public Native_AddTopColorToTrie(Handle:plugin, numParams)
 {
-	new colorName_maxLength;
-	GetNativeStringLength(1, colorName_maxLength);
+	new colorName_maxLength = 256;
 	decl String:colorName[colorName_maxLength];
 	GetNativeString(1, colorName, colorName_maxLength);
 	new red = GetNativeCell(2),
@@ -352,11 +345,10 @@ public Native_AddTopColorToTrie(Handle:plugin, numParams)
 	return returnVal;
 }
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 public Native_AddChatColorToTrie(Handle:plugin, numParams)
 {
-	new colorName_maxLength;
-	GetNativeStringLength(1, colorName_maxLength);
+	new colorName_maxLength = 256;
 	decl String:colorName[colorName_maxLength];
 	GetNativeString(1, colorName, colorName_maxLength);
 	new hex = GetNativeCell(2);
@@ -386,7 +378,7 @@ public OnPluginStart()
 {
 	CreateConVar("extended_advertisements_version", PLUGIN_VERSION, "Display advertisements", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
-	#if defined ADVERT_TF2COLORS
+	#if defined ADVERT_SOURCE2009
 	if (!IsGameCompatible())
 		SetFailState("[Extended Advertisements] You are running a version of this plugin that is incompatible with your game.");
 	#endif
@@ -395,7 +387,7 @@ public OnPluginStart()
 	g_hAdvertFile = CreateConVar("sm_extended_advertisements_file", "configs/extended_advertisements.txt", "What is the file directory of the advertisements file");
 	g_hExitPanel = CreateConVar("sm_extended_advertisements_exitmenu", "1", "In \"M\" type menus, can clients close the menu with the press of any button?");
 	g_hExtraTopColorsPath = CreateConVar("sm_extended_advertisement_extratopcolors_file", "configs/extra_top_colors.txt", "What is the directory of the \"Extra Top Colors\" config?");
-	#if defined ADVERT_TF2COLORS
+	#if defined ADVERT_SOURCE2009
 	g_hExtraChatColorsPath = CreateConVar("sm_extended_advertisements_extrachatcolors_file", "configs/extra_chat_colors.txt", "What is the directory of the \"Extra Chat Colors\" config?");
 	#endif
 	
@@ -404,7 +396,7 @@ public OnPluginStart()
 	HookConVarChange(g_hAdvertFile, OnAdvertFileChange);
 	HookConVarChange(g_hExitPanel, OnExitChange);
 	HookConVarChange(g_hExtraTopColorsPath, OnExtraTopColorsPathChange);
-	#if defined ADVERT_TF2COLORS
+	#if defined ADVERT_SOURCE2009
 	HookConVarChange(g_hExtraChatColorsPath, OnExtraChatColorsPathChange);
 	#endif
 	
@@ -425,7 +417,7 @@ public OnPluginStart()
 	g_hForwardPreReplace = CreateGlobalForward("OnAdvertPreReplace", ET_Hook, Param_String, Param_String, Param_String, Param_CellByRef);
 	g_hForwardPostAdvert = CreateGlobalForward("OnPostAdvertisementShown", ET_Ignore, Param_String, Param_String, Param_String, Param_Cell);
 	g_hForwardPreClientReplace = CreateGlobalForward("OnAdvertPreClientReplace", ET_Single, Param_Cell, Param_String, Param_String, Param_String, Param_CellByRef);
-#if defined ADVERT_TF2COLORS	
+#if defined ADVERT_SOURCE2009	
 	g_hForwardPreAddChatColor = CreateGlobalForward("OnAddChatColorPre", ET_Hook, Param_String, Param_Cell, Param_CellByRef);
 	g_hForwardPostAddChatColor = CreateGlobalForward("OnAddChatColorPost", ET_Ignore, Param_String, Param_Cell);
 #endif
@@ -444,7 +436,7 @@ public OnPluginStart()
 		Updater_AddPlugin(UPDATE_URL);
 }
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 stock bool:IsGameCompatible()
 {
 	/*new sdkversion = GuessSDKVersion();
@@ -460,16 +452,16 @@ public Action:Command_DeleteAdvert(client, args)
 {
 	if (args < 1)
 	{
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Usage");
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Del_Usage");
 		return Plugin_Handled;
 	}
 	decl String:arg[256];
 	GetCmdArgString(arg, sizeof(arg));
 	StripQuotes(arg);
 	if (DeleteAdvert(arg))
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Success", arg);
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Del_Success", arg);
 	else
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Del_Fail", arg);
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Del_Fail", arg);
 	return Plugin_Handled;
 }
 
@@ -489,9 +481,9 @@ public Action:Command_AddAdvert(client, args)
 				noFlagBits = ReadFlagString(arg[4]);
 			
 			if (AddAdvert(arg[0], arg[1], arg[2], flagBits, noFlagBits))
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
 			else
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		case 4:
 		{
@@ -502,9 +494,9 @@ public Action:Command_AddAdvert(client, args)
 			new flagBits = ReadFlagString(arg[3]);
 			
 			if (AddAdvert(arg[0], arg[1], arg[2], flagBits))
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
 			else
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		case 3:
 		{
@@ -514,13 +506,13 @@ public Action:Command_AddAdvert(client, args)
 			}
 			
 			if (AddAdvert(arg[0], arg[1], arg[2]))
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Success", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Success", arg[0]);
 			else
-				ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Fail", arg[0]);
+				ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Fail", arg[0]);
 		}
 		default:
 		{
-			ReplyToCommand(client, "%T %T", "Advert_Tag", "Add_Usage");
+			ReplyToCommand(client, "%t %t", "Advert_Tag", "Add_Usage");
 			return Plugin_Handled;
 		}
 	}
@@ -586,7 +578,7 @@ public OnGameFrame()
 public OnConfigsExecuted()
 {
 	InitiConfiguration();
-	#if defined ADVERT_TF2COLORS
+	#if defined ADVERT_SOURCE2009
 	parseExtraChatColors();
 	#endif
 	parseExtraTopColors();
@@ -653,7 +645,7 @@ stock InitiConfiguration()
 	GetConVarString(g_hExtraTopColorsPath, advertPath, sizeof(advertPath));
 	BuildPath(Path_SM, g_strExtraTopColorsPath, sizeof(g_strExtraTopColorsPath), advertPath);
 	
-	#if defined ADVERT_TF2COLORS
+	#if defined ADVERT_SOURCE2009
 	GetConVarString(g_hExtraChatColorsPath, advertPath, sizeof(advertPath));
 	BuildPath(Path_SM, g_strExtraChatColorsPath, sizeof(g_strExtraChatColorsPath), advertPath);
 	#endif
@@ -673,7 +665,7 @@ public OnExitChange(Handle:conVar, const String:oldValue[], const String:newValu
 	g_bExitPanel = StringToInt(newValue) ? true : false;
 }
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 public OnExtraChatColorsPathChange(Handle:conVar, const String:oldValue[], const String:newValue[])
 {
 	BuildPath(Path_SM, g_strExtraChatColorsPath, sizeof(g_strExtraChatColorsPath), newValue);
@@ -1017,7 +1009,7 @@ public Action:Command_ShowAd(client, args)
 		StripQuotes(arg);
 		if (!ShowAdvert(arg))
 		{
-			ReplyToCommand(client, "%T %T", "Advert_Tag", "ShowAd_NotFound");
+			ReplyToCommand(client, "%t %t", "Advert_Tag", "ShowAd_NotFound");
 			return Plugin_Handled;
 		}
 	}
@@ -1030,7 +1022,7 @@ public Action:Command_ReloadAds(client, args)
 {
 	if (g_bPluginEnabled)
 	{
-		#if defined ADVERT_TF2COLORS
+		#if defined ADVERT_SOURCE2009
 		parseExtraChatColors();
 		#endif
 		if (g_hTopColorTrie != INVALID_HANDLE)
@@ -1040,7 +1032,7 @@ public Action:Command_ReloadAds(client, args)
 		if (g_hAdvertisements != INVALID_HANDLE)
 			CloseHandle(g_hAdvertisements);
 		parseAdvertisements();
-		ReplyToCommand(client, "%T %T", "Advert_Tag", "Config_Reloaded");
+		ReplyToCommand(client, "%t %t", "Advert_Tag", "Config_Reloaded");
 	}
 	return Plugin_Handled;
 }
@@ -1325,7 +1317,7 @@ public Native_CanViewAdvert(Handle:plugin, numParams)
 	return false;
 }
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 stock parseExtraChatColors()
 {
 	if (g_bPluginEnabled)
@@ -1427,7 +1419,7 @@ stock removeTopColors(String:input[], maxlength, bool:ignoreChat = true)
 		}
 		index += last + 2;
 		String_ToLower(part, part, sizeof(part));
-		#if defined ADVERT_TF2COLORS
+		#if defined ADVERT_SOURCE2009
 		new value_ex;
 		if (ignoreChat && (GetTrieValue(CTrie, part, value_ex) || !strcmp(part, "default", false) || !strcmp(part, "teamcolor", false)))
 			result = true;

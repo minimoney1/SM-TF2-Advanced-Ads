@@ -4,7 +4,7 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.2.7-fix"
+			"Latest"	"1.2.8"
 		}
 		
 		"Notes"		"Fixed Bugs"
@@ -17,5 +17,6 @@
 		"Source"	"Path_SM/scripting/adv_adverts.sp"
 		"Source"	"Path_SM/scripting/include/extended_adverts.inc"
 		"Source"	"Path_SM/scripting/include/morecolors_ads.inc"
+		"Source"	"Path_SM/scripting/include/colors_ads.inc"
 	}
 }

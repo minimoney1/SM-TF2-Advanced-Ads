@@ -5,7 +5,7 @@
 public SharedPlugin:__pl_adv_adverts = 
 {
 	name = "adv_adverts",
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 	file = "adv_adverts_tf2.smx",
 #else
 	file = "adv_adverts_nontf2.smx",
@@ -41,7 +41,7 @@ native bool:AdvertExists(const String:advertId[]);
 
 native bool:DeleteAdvert(const String:advertId[]);
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 
 /**
  * 
@@ -142,7 +142,7 @@ native bool:AddExtraTopColor(String:colorName[], red, green, blue, alpha, bool:r
  */
 native bool:Client_CanViewAds(client, flagBits = -1, noFlagBits = -1);
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 /**
  * 
  * Adds a color to the extra chat colors trie.
@@ -150,7 +150,7 @@ native bool:Client_CanViewAds(client, flagBits = -1, noFlagBits = -1);
  * @param colorName		The color name (without curly brackets), this is the name that you will use inside of the '{' and '}' tags in the config.
  * @param hex			The exadecimal representation of the color (0xRRGGBB)
  * 
- * @note				To use this native, you need to have #define ADVERT_TOPCOLORS before including this file.
+ * @note				To use this native, you need to have #define ADVERT_SOURCE2009 before including this file.
  * 
  * @return				True if the color was added, false if a color with an equal name was found or another issue occured (Such as a blockage by an external plugin)
  */
@@ -209,7 +209,7 @@ forward bool:OnAdvertPreClientReplace(client, const String:advertId[], const Str
  */
 forward OnPostAdvertisementShown(const String:advertId[], const String:advertType[], const String:advertText[], advertFlags);
 
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 /**
  * 
  * Called right before an extra chat color is added.
@@ -347,7 +347,7 @@ public __pl_adv_adverts_SetNTVOptional()
 	MarkNativeAsOptional("ReloadAdverts");
 	MarkNativeAsOptional("ShowAdvert");
 	MarkNativeAsOptional("AddAdvert");
-#if defined ADVERT_TF2COLORS
+#if defined ADVERT_SOURCE2009
 	MarkNativeAsOptional("AddExtraChatColor");
 #endif
 }

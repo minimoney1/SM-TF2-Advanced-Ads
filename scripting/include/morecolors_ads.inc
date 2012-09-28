@@ -20,12 +20,26 @@ new Handle:CTrie = INVALID_HANDLE;
 
 stock CSayTextToClient(client, const String:text[])
 {
-	new Handle:bf = StartMessageOne("SayText2", client, USERMSG_RELIABLE);
-	BfWriteByte(bf, 0);
-	BfWriteByte(bf, true);
-	BfWriteString(bf, text);
-	
-	EndMessage();
+	if (GetUserMessageId("SayText2") != INVALID_MESSAGE_ID)
+	{
+		new Handle:bf = StartMessageOne("SayText2", client, USERMSG_RELIABLE);
+		BfWriteByte(bf, 0);
+		BfWriteByte(bf, true);
+		BfWriteString(bf, text);
+
+		EndMessage();
+	}
+	else if (GetUserMessageId("SayText") != INVALID_MESSAGE_ID)
+	{
+		new Handle:bf = StartMessageOne("SayText", client, USERMSG_RELIABLE);
+		BfWriteByte(bf, 0);
+		BfWriteString(bf, text);
+		BfWriteByte(bf, true);
+
+		EndMessage();
+	}
+	else
+		PrintToChat(client, text);
 }
 
 /**
