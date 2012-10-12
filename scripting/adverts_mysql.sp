@@ -53,6 +53,8 @@ public OnAdvertsLoaded()
 	}
 	else
 	{
+		decl String:query[256];
+		SQL_EscapeString(g_hConnectionDB, QUERY, query, sizeof(query));		
 		SQL_TQuery(g_hConnectionDB, OnQueryEstablished, QUERY);
 	}
 }
@@ -114,6 +116,8 @@ public Action:Timer_EstablishDB(Handle:timer)
 		SetFailState("Couldn't establish connection in time.");
 	else
 	{
+		decl String:query[256];
+		SQL_EscapeString(g_hConnectionDB, QUERY, query, sizeof(query));
 		SQL_TQuery(g_hConnectionDB, OnQueryEstablished, QUERY);
 	}
 }

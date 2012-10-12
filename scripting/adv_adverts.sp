@@ -603,7 +603,7 @@ public OnPluginStart()
 	
 	g_bUseSteamTools = (CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "Steam_GetPublicIP") == FeatureStatus_Available);
 	
-	InitiConfiguration();
+	InitConfiguration();
 	#if defined ADVERT_SOURCE2009
 	parseExtraChatColors();
 	#endif
@@ -740,7 +740,7 @@ public OnGameFrame()
 
 public OnConfigsExecuted()
 {
-	InitiConfiguration();
+	InitConfiguration();
 	#if defined ADVERT_SOURCE2009
 	parseExtraChatColors();
 	#endif
@@ -761,7 +761,7 @@ public OnConfigsExecuted()
 			KillTimer(g_hAdvertTimer);
 			g_hAdvertTimer = INVALID_HANDLE;
 		}
-		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		g_hAdvertTimer = CreateTimer(KvGetFloat(g_hAdvertisements, "time", g_fAdvertDelay), AdvertisementTimer);
 	}
 }
 
@@ -782,7 +782,7 @@ public OnMapStart()
 			KillTimer(g_hAdvertTimer);
 			g_hAdvertTimer = INVALID_HANDLE;
 		}
-		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		g_hAdvertTimer = CreateTimer(KvGetFloat(g_hAdvertisements, "time", g_fAdvertDelay), AdvertisementTimer);
 	}
 }
 
@@ -795,7 +795,7 @@ public OnMapEnd()
 	}
 }
 
-stock InitiConfiguration()
+stock InitConfiguration()
 {
 	g_bPluginEnabled = GetConVarBool(g_hPluginEnabled);
 	g_fAdvertDelay = GetConVarFloat(g_hAdvertDelay);
@@ -863,7 +863,7 @@ public OnEnableChange(Handle:conVar, const String:oldValue[], const String:newVa
 				KillTimer(g_hAdvertTimer);
 				g_hAdvertTimer = INVALID_HANDLE;
 			}
-			g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+			g_hAdvertTimer = CreateTimer(KvGetFloat(g_hAdvertisements, "time", g_fAdvertDelay), AdvertisementTimer);
 		}
 	}
 }
@@ -887,7 +887,7 @@ public OnAdvertDelayChange(Handle:conVar, const String:oldValue[], const String:
 			KillTimer(g_hAdvertTimer);
 			g_hAdvertTimer = INVALID_HANDLE;
 		}
-		g_hAdvertTimer = CreateTimer(g_fAdvertDelay, AdvertisementTimer, _, TIMER_REPEAT);
+		g_hAdvertTimer = CreateTimer(KvGetFloat(g_hAdvertisements, "time", g_fAdvertDelay), AdvertisementTimer);
 	}
 }
 
@@ -947,7 +947,15 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		Call_Finish(_:forwardReturn);
 		
 		if (forwardReturn == Plugin_Handled || forwardReturn == Plugin_Stop)
+		{
+			if (g_hAdvertTimer != INVALID_HANDLE)
+			{
+				KillTimer(g_hAdvertTimer);
+				g_hAdvertTimer = INVALID_HANDLE;
+			}
+			g_hAdvertTimer = CreateTimer(KvGetFloat(g_hAdvertisements, "time", g_fAdvertDelay), AdvertisementTimer);
 			return Plugin_Continue;
+		}
 		
 		ReplaceAdText(sText, sText, sizeof(sText));
 		strcopy(sBuffer, sizeof(sBuffer), sText);
@@ -1149,6 +1157,13 @@ public Action:AdvertisementTimer(Handle:advertTimer)
 		Call_PushCell(flagBits);
 		Call_PushCell(noFlagBits);
 		Call_Finish();
+
+		if (g_hAdvertTimer != INVALID_HANDLE)
+		{
+			KillTimer(g_hAdvertTimer);
+			g_hAdvertTimer = INVALID_HANDLE;
+		}
+		g_hAdvertTimer = CreateTimer(KvGetFloat(g_hAdvertisements, "time", g_fAdvertDelay), AdvertisementTimer);
 	}
 	return Plugin_Continue;
 }
@@ -1236,30 +1251,60 @@ stock parseAdvertisements()
 	{
 		g_hAdvertisements = CreateKeyValues("Advertisements");
 		
-		if (FileExists(g_strConfigPath)) 
+		new Handle:kv = CreateKeyValues("Advertisements");
+
+		if (FileToKeyValues(kv, g_strConfigPath))
 		{
-			new Handle:kv = CreateKeyValues("Advertisements");
-			FileToKeyValues(kv, g_strConfigPath);
-			KvGotoFirstSubKey(kv);
-			decl String:sBuffer[5][256];
+			if (!KvGotoFirstSubKey(kv))
+				LogError("Did not find any advertisements in config file.");
+
+			decl String:name[32], String:sKeyName[64];
 			do
 			{
-				KvGetSectionName(kv, sBuffer[4], sizeof(sBuffer[]));
-				for (new i = 0; i < sizeof(g_strKeyValueKeyList); i++)
+				KvGetSectionName(kv, name, sizeof(name));
+
+				if (!KvGotoFirstSubKey(kv, false))
 				{
-					sBuffer[i][0] = '\0';
-					KvGetString(kv, g_strKeyValueKeyList[i], sBuffer[i], sizeof(sBuffer[]), "");
+					LogError("Could not load advertisements ID \"%s\"", name);
+					return;
 				}
 
-				AddAdvert(sBuffer[4], sBuffer[0], sBuffer[1], sBuffer[2], sBuffer[3], false, true);
+				new Handle:array, Handle:trie;
+
+				do
+				{
+					KvGetSectionName(kv, sKeyName, sizeof(sKeyName));
+					PushArrayString(array, sKeyName);
+					switch (KvGetDataType(kv))
+					{
+						case KvData_None, KvData_String, KvData_UInt64, KvData_WString, KvData_Ptr:
+						{
+							decl String:buffer[512];
+							GetKvString(kv, NULL_STRING, buffer, sizeof(buffer));
+							SetTrieString(trie, sKeyName, buffer);
+						}
+						case KvData_Color:
+						{
+							decl Float:vec[3];
+							GetKv
+						}
+					}
+				}
+				while (KvGotoNextKey(kv, false));
+
+				
+				CloseHandle(trie);
+				CloseHandle(array);
 			}
 			while (KvGotoNextKey(kv));
-			CloseHandle(kv);
-		} 
+		}
+
 		else 
 		{
-			SetFailState("Advertisement file \"%s\" was not found.", g_strConfigPath);
+			LogError("Advertisement file \"%s\" was not found.", g_strConfigPath);
 		}
+
+		CloseHandle(kv);
 	}
 }
 
@@ -1278,7 +1323,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 					continue;
 				}
 				strcopy(replace, sizeof(replace), part);
-				if (StrContains(part, "{CONVAR_BOOL:", false) == 0)
+				if (part[8] == '_')
 				{
 					replace[FindCharInString(replace, '}')] = '\0';
 					new Handle:conVarFound = FindConVar(replace[13]);
@@ -1293,7 +1338,7 @@ stock ReplaceAdText(const String:inputText[], String:outputText[], outputText_ma
 					else
 						replace[0] = '\0';
 				}
-				else if (StrContains(part, "{CONVAR:", false) == 0)
+				else
 				{
 					replace[FindCharInString(replace, '}')] = '\0';
 					new Handle:conVarFound = FindConVar(replace[8]);
