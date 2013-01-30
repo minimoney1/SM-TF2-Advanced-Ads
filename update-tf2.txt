@@ -7,7 +7,7 @@
 			"Latest"	"1.2.8"
 		}
 		
-		"Notes"		"Fixed Bugs"
+		"Notes"		"CS:GO Protobuff Support"
 	}
 	
 	"Files"

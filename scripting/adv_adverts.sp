@@ -18,7 +18,7 @@
 #include <smlib>
 #include <extended_adverts>
 
-#define PLUGIN_VERSION "1.2.8"
+#define PLUGIN_VERSION "1.2.9"
 
 #if defined ADVERT_SOURCE2009
 #define UPDATE_URL "http://dl.dropbox.com/u/83581539/update-tf2.txt"
